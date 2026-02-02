@@ -80,14 +80,15 @@ public class CircuitValidator : MonoBehaviour
         }
 
         // Проверка 3: есть ли соединения в ConnectionManager
-        if ((object)ConnectionManager.Instance == null)
+        if ((object)SuperSimpleConnectionManager.Instance == null)
         {
             Debug.Log($"  LED {led.name}: ConnectionManager not found");
             return false;
         }
 
-        // Проверяем через ConnectionManager
-        return ConnectionManager.Instance.IsCircuitComplete(led);
+        // ВАЖНО: Проверяем тип метода IsCircuitComplete
+        // Если метод принимает CircuitComponent - передаем led как CircuitComponent
+        return SuperSimpleConnectionManager.Instance.IsCircuitComplete(led);
     }
 
     // Метод для ручной проверки конкретного LED

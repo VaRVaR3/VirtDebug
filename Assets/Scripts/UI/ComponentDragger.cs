@@ -1,45 +1,81 @@
-using UnityEngine;
+п»їusing UnityEngine;
 using UnityEngine.EventSystems;
 using System.Collections;
 
+[RequireComponent(typeof(Collider))]
 public class ComponentDragger : MonoBehaviour
 {
     public bool isDragging { get; private set; } = false;
+
     private Vector3 offset;
     private Vector3 originalPosition;
     private Camera mainCamera;
 
     [Header("Dragging Settings")]
-    public float dragSpeed = 10f;
+    public float dragSpeed = 5f;
     public float rotationSpeed = 100f;
-    public bool useGrid = true;
+    public bool useGrid = false;
     public float gridSize = 0.25f;
-    public float liftHeight = 0.1f;
+    public float liftHeight = 0.05f;
+
+    [Header("Raycast Settings")]
+    public LayerMask groundLayer = 1 << 0;
+    public float maxDragDistance = 200f;
+
+    [Header("Fix Collider Refresh")]
+    [Tooltip("РђРІС‚РѕРјР°С‚РёС‡РµСЃРєРё 'РїРµСЂРµР·Р°РїСѓСЃРєР°РµС‚' РєРѕР»Р»Р°Р№РґРµСЂ РЅР° СЃС‚Р°СЂС‚Рµ (РєР°Рє Р±СѓРґС‚Рѕ С‚С‹ РІСЂСѓС‡РЅСѓСЋ РґРµСЂРЅСѓР» IsTrigger), С‡С‚РѕР±С‹ РєР»РёРєРё/drag СЃС‚Р°Р±РёР»СЊРЅРѕ СЂР°Р±РѕС‚Р°Р»Рё.")]
+    public bool autoRefreshCollider = true;
 
     void Start()
     {
         mainCamera = Camera.main;
+        if (mainCamera == null)
+            Debug.LogError("Main camera not found!");
+
+        var col = GetComponent<Collider>();
+        if (col == null)
+            Debug.LogError($"вќЊ {name}: No Collider found, dragging won't work!");
+
+        if (autoRefreshCollider && col != null)
+        {
+            StartCoroutine(RefreshColliderNextFrame(col));
+        }
+    }
+
+    private IEnumerator RefreshColliderNextFrame(Collider col)
+    {
+        // Р¶РґС‘Рј РєР°РґСЂ, С‡С‚РѕР±С‹ РїРѕСЃР»Рµ РёРЅСЃС‚Р°РЅСЃР°/Start РґСЂСѓРіРёС… РєРѕРјРїРѕРЅРµРЅС‚РѕРІ РІСЃС‘ СЃС‚Р°Р±РёР»РёР·РёСЂРѕРІР°Р»РѕСЃСЊ
+        yield return null;
+
+        // Р±РµР·РѕРїР°СЃРЅС‹Р№ "rebuild" РєРѕР»Р»Р°Р№РґРµСЂР°
+        bool prevEnabled = col.enabled;
+        col.enabled = false;
+        Physics.SyncTransforms();   // РЅР° РІСЃСЏРєРёР№ СЃР»СѓС‡Р°Р№
+        col.enabled = prevEnabled;
+        Physics.SyncTransforms();
+
+        // РґРѕРїРѕР»РЅРёС‚РµР»СЊРЅС‹Р№ РїРёРЅРѕРє: РёРЅРѕРіРґР° РїРѕРјРѕРіР°РµС‚ РїСЂРё СЃС‚СЂР°РЅРЅС‹С… bounds
+        col.enabled = false;
+        col.enabled = true;
+        Physics.SyncTransforms();
+
+        // Debug.Log($"вњ… Collider refreshed on {name}");
     }
 
     void OnMouseDown()
     {
-        // Проверяем, нет ли UI поверх
-        if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
-        {
-            Debug.Log("Pointer over UI, not dragging");
-            return;
-        }
+        Debug.Log($"ComponentDragger: Mouse down on {name}");
 
-        // Проверяем, не пытаемся ли мы соединять пины
-        if (ConnectionManager.Instance != null && ConnectionManager.Instance.isConnecting)
-        {
-            Debug.Log("Currently connecting pins, not dragging");
-            return;
-        }
-
-        // Проверяем, можно ли перетаскивать этот компонент
         if (!CanStartDragging())
         {
+            Debug.Log("Cannot start dragging");
+            return;
+        }
+
+        // Р•СЃР»Рё РєР»РёРє РїСЂРёС€С‘Р» С‡РµСЂРµР· РїРёРЅ вЂ” РЅРµ РЅР°С‡РёРЅР°РµРј РґСЂР°Рі
+        if (IsPointerOverPin())
+        {
+            Debug.Log("Click was on a pin, not dragging component.");
             return;
         }
 
@@ -48,34 +84,50 @@ public class ComponentDragger : MonoBehaviour
 
     void OnMouseDrag()
     {
-        if (!isDragging) return;
+        if (!isDragging || !this || gameObject == null) return;
+        if (mainCamera == null) return;
 
         Ray ray = mainCamera.ScreenPointToRay(Input.mousePosition);
-        Plane plane = new Plane(Vector3.up, new Vector3(0, originalPosition.y + liftHeight, 0));
-        float distance;
+        RaycastHit hit;
 
-        if (plane.Raycast(ray, out distance))
+        bool hitGround = Physics.Raycast(ray, out hit, maxDragDistance, groundLayer);
+
+        Vector3 targetPosition;
+
+        if (hitGround)
         {
-            Vector3 targetPosition = ray.GetPoint(distance) + offset;
+            targetPosition = hit.point + offset;
+        }
+        else
+        {
+            Plane plane = new Plane(Vector3.up, new Vector3(0f, originalPosition.y, 0f));
+            float distance;
 
-            // Применяем сетку если нужно
-            if (useGrid)
+            if (plane.Raycast(ray, out distance))
             {
-                targetPosition.x = Mathf.Round(targetPosition.x / gridSize) * gridSize;
-                targetPosition.z = Mathf.Round(targetPosition.z / gridSize) * gridSize;
+                Vector3 hitPoint = ray.GetPoint(distance);
+                targetPosition = hitPoint + offset;
             }
-
-            // Плавное перемещение
-            transform.position = Vector3.Lerp(transform.position, targetPosition, Time.deltaTime * dragSpeed);
-
-            // Обновляем все провода, связанные с этим компонентом
-            UpdateConnectedWires();
+            else
+            {
+                return;
+            }
         }
 
-        // Вращение колесиком мыши
-        if (Input.GetAxis("Mouse ScrollWheel") != 0)
+        if (useGrid)
         {
-            float rotation = Input.GetAxis("Mouse ScrollWheel") * rotationSpeed;
+            targetPosition.x = Mathf.Round(targetPosition.x / gridSize) * gridSize;
+            targetPosition.z = Mathf.Round(targetPosition.z / gridSize) * gridSize;
+        }
+
+        transform.position = Vector3.Lerp(transform.position, targetPosition, Time.deltaTime * dragSpeed * 2f);
+
+        UpdateConnectedWires();
+
+        float scroll = Input.GetAxis("Mouse ScrollWheel");
+        if (scroll != 0)
+        {
+            float rotation = scroll * rotationSpeed;
             transform.Rotate(0, rotation, 0, Space.World);
         }
     }
@@ -84,18 +136,56 @@ public class ComponentDragger : MonoBehaviour
     {
         if (!isDragging) return;
 
-        // Опускаем объект обратно
         Vector3 finalPosition = transform.position;
         finalPosition.y = originalPosition.y;
         transform.position = finalPosition;
 
         isDragging = false;
-        Debug.Log($"Stopped dragging {gameObject.name}");
+        Debug.Log($"вњ… Stopped dragging {gameObject.name}");
+    }
+
+    private bool CanStartDragging()
+    {
+        if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+        {
+            Debug.Log("Pointer over UI, not dragging");
+            return false;
+        }
+
+        if (SuperSimpleConnectionManager.Instance != null && SuperSimpleConnectionManager.Instance.isConnecting)
+        {
+            Debug.Log("Currently connecting pins, not dragging");
+            return false;
+        }
+
+        CircuitComponent circuit = GetComponent<CircuitComponent>();
+        if (circuit != null && !circuit.isActive)
+        {
+            Debug.LogWarning("Cannot drag burned component!");
+            return false;
+        }
+
+        return true;
+    }
+
+    private bool IsPointerOverPin()
+    {
+        if (mainCamera == null) return false;
+
+        Ray ray = mainCamera.ScreenPointToRay(Input.mousePosition);
+        RaycastHit hit;
+
+        if (Physics.Raycast(ray, out hit, maxDragDistance))
+        {
+            if (hit.collider != null && hit.collider.GetComponent<UltraSimplePin>() != null)
+                return true;
+        }
+
+        return false;
     }
 
     private void StartDragging()
     {
-        // Проверяем нет ли перетаскиваемого родителя
         if (IsParentBeingDragged())
         {
             Debug.Log("Parent is being dragged, not starting new drag");
@@ -103,18 +193,23 @@ public class ComponentDragger : MonoBehaviour
         }
 
         isDragging = true;
-
-        // Сохраняем начальную позицию
         originalPosition = transform.position;
 
-        // Поднимаем объект
         Vector3 liftedPosition = originalPosition;
         liftedPosition.y += liftHeight;
         transform.position = liftedPosition;
 
-        // Рассчитываем смещение
+        CalculateOffset(liftedPosition);
+
+        Debug.Log($"вњ… Started dragging {gameObject.name}");
+    }
+
+    private void CalculateOffset(Vector3 liftedPosition)
+    {
+        if (mainCamera == null) return;
+
         Ray ray = mainCamera.ScreenPointToRay(Input.mousePosition);
-        Plane plane = new Plane(Vector3.up, liftedPosition);
+        Plane plane = new Plane(Vector3.up, new Vector3(0f, liftedPosition.y, 0f));
         float distance;
 
         if (plane.Raycast(ray, out distance))
@@ -122,8 +217,6 @@ public class ComponentDragger : MonoBehaviour
             Vector3 hitPoint = ray.GetPoint(distance);
             offset = transform.position - hitPoint;
         }
-
-        Debug.Log($"Started dragging {gameObject.name}");
     }
 
     private bool IsParentBeingDragged()
@@ -141,54 +234,10 @@ public class ComponentDragger : MonoBehaviour
         return false;
     }
 
-    private bool CanStartDragging()
-    {
-        // Проверяем состояние компонента
-        CircuitComponent circuit = GetComponent<CircuitComponent>();
-        if (circuit != null && !circuit.isActive)
-        {
-            Debug.LogWarning("Cannot drag burned component!");
-            return false;
-        }
-
-        return true;
-    }
-
     private void UpdateConnectedWires()
     {
-        // Находим все WireVisual в дочерних объектах и принудительно обновляем
-        WireVisual[] wires = GetComponentsInChildren<WireVisual>();
-        foreach (var wire in wires)
-        {
-            if (wire != null)
-            {
-                // Используем публичный метод для обновления
-                wire.ForceUpdateWire();
-            }
-        }
-
-        // Также обновляем все провода, которые соединены с этим компонентом
-        // Используем старый способ проверки IConnectable
-        MonoBehaviour mono = this as MonoBehaviour;
-        if (mono != null)
-        {
-            IConnectable connectable = mono as IConnectable;
-            if (connectable != null && ConnectionManager.Instance != null)
-            {
-                var connections = ConnectionManager.Instance.GetConnectionsForComponent(connectable);
-                foreach (var conn in connections)
-                {
-                    if (conn.wireVisual != null)
-                    {
-                        WireVisual wire = conn.wireVisual.GetComponent<WireVisual>();
-                        if (wire != null)
-                        {
-                            wire.ForceUpdateWire();
-                        }
-                    }
-                }
-            }
-        }
+        if (SuperSimpleConnectionManager.Instance == null) return;
+        SuperSimpleConnectionManager.Instance.UpdateAllWires();
     }
 
     public void ForceStopDragging()
@@ -201,7 +250,6 @@ public class ComponentDragger : MonoBehaviour
 
     void OnDisable()
     {
-        // При отключении останавливаем перетаскивание
         ForceStopDragging();
     }
 }

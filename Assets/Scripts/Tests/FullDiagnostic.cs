@@ -36,12 +36,12 @@ public class FullDiagnostic : MonoBehaviour
         // 2. Проверка ConnectionManager
         Debug.Log("\n2. Проверка ConnectionManager:");
 
-        if (ConnectionManager.Instance == null)
+        if (SuperSimpleConnectionManager.Instance == null)
             Debug.LogError("❌ ConnectionManager.Instance = NULL!");
         else
         {
             Debug.Log("✅ ConnectionManager.Instance существует");
-            Debug.Log($"   isConnecting: {ConnectionManager.Instance.isConnecting}");
+            Debug.Log($"   isConnecting: {SuperSimpleConnectionManager.Instance.isConnecting}");
         }
 
         // 3. Проверка компонентов
@@ -134,13 +134,13 @@ public class FullDiagnostic : MonoBehaviour
         }
 
         // 2. Проверяем и создаем ConnectionManager если нет
-        if (ConnectionManager.Instance == null)
+        if (SuperSimpleConnectionManager.Instance == null)
         {
-            ConnectionManager cm = FindObjectOfType<ConnectionManager>();
+            SuperSimpleConnectionManager cm = FindObjectOfType<SuperSimpleConnectionManager>();
             if (cm == null)
             {
                 GameObject cmObj = new GameObject("ConnectionManager");
-                cm = cmObj.AddComponent<ConnectionManager>();
+                cm = cmObj.AddComponent<SuperSimpleConnectionManager>();
                 Debug.Log("✅ Создан ConnectionManager");
             }
             else
@@ -217,11 +217,11 @@ public class FullDiagnostic : MonoBehaviour
         y += 20;
         GUI.Label(new Rect(10, y, 400, 30), "=== СТАТУС СИСТЕМЫ ===", style); y += 30;
 
-        if (ConnectionManager.Instance == null)
+        if (SuperSimpleConnectionManager.Instance == null)
             GUI.Label(new Rect(10, y, 400, 30), "ConnectionManager: ❌ НЕ НАЙДЕН", style);
         else
         {
-            string status = ConnectionManager.Instance.isConnecting ? "CONNECTING" : "IDLE";
+            string status = SuperSimpleConnectionManager.Instance.isConnecting ? "CONNECTING" : "IDLE";
             GUI.Label(new Rect(10, y, 400, 30), $"ConnectionManager: ✅ ({status})", style);
         }
         y += 30;

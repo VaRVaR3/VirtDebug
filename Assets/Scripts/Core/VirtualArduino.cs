@@ -54,11 +54,63 @@ public class VirtualArduino : MonoBehaviour, IConnectable
         }
     }
 
-    // Реализация IConnectable
+    // ========== IConnectable IMPLEMENTATION ==========
+
     public string GetName()
     {
         return name;
     }
+
+    public void OnConnected(int pin, IConnectable otherComponent, int otherPin)
+    {
+        Debug.Log($"Arduino {name}: pin {pin} connected to {otherComponent.GetName()}:{otherPin}");
+    }
+
+    public void OnDisconnected(int pin)
+    {
+        Debug.Log($"Arduino {name}: pin {pin} disconnected");
+    }
+
+    public Vector3 GetPinPosition(int pin)
+    {
+        // Пробуем найти UltraSimplePin
+        UltraSimplePin[] ultraPins = GetComponentsInChildren<UltraSimplePin>();
+        foreach (var pinObj in ultraPins)
+        {
+            if (pinObj.pinNumber == pin)
+            {
+                return pinObj.transform.position;
+            }
+        }
+
+        // Если UltraSimplePin не найден, пробуем найти PinHighlighter
+        PinHighlighter[] oldPins = GetComponentsInChildren<PinHighlighter>();
+        foreach (var pinObj in oldPins)
+        {
+            if (pinObj.pinNumber == pin)
+            {
+                return pinObj.transform.position;
+            }
+        }
+
+        // Для GND пинов
+        foreach (var groundPin in groundPins)
+        {
+            if (groundPin.pinNumber == pin)
+            {
+                return groundPin.transform.position;
+            }
+        }
+
+        return transform.position + new Vector3(0.1f * (pin % 10), 0, 0.1f * (pin / 10));
+    }
+
+    public bool CanConnectTo(int pin, IConnectable otherComponent, int otherPin)
+    {
+        return true;
+    }
+
+    // ========== ОСТАЛЬНЫЕ МЕТОДЫ (без изменений) ==========
 
     void CreateGroundPins()
     {
@@ -92,8 +144,6 @@ public class VirtualArduino : MonoBehaviour, IConnectable
         groundPin.pinVisual = pinHighlighter;
 
         groundPins.Add(groundPin);
-
-        Debug.Log($"Created Arduino GND pin {pinNumber} at {localPosition}");
     }
 
     public ArduinoGroundPin GetGroundPin(int index = 0)
@@ -101,29 +151,6 @@ public class VirtualArduino : MonoBehaviour, IConnectable
         if (index >= 0 && index < groundPins.Count)
             return groundPins[index];
         return null;
-    }
-
-    public Vector3 GetPinPosition(int pin)
-    {
-        foreach (var groundPin in groundPins)
-        {
-            if (groundPin.pinNumber == pin)
-            {
-                return groundPin.transform.position;
-            }
-        }
-
-        PinHighlighter[] pins = GetComponentsInChildren<PinHighlighter>();
-        foreach (PinHighlighter pinObj in pins)
-        {
-            if (pinObj.pinNumber == pin)
-            {
-                return pinObj.transform.position;
-            }
-        }
-
-        Debug.LogWarning($"Pin {pin} not found on {name}, returning Arduino position with offset");
-        return transform.position + new Vector3(0, 0.1f * pin, 0);
     }
 
     void InitializePins()
@@ -137,46 +164,6 @@ public class VirtualArduino : MonoBehaviour, IConnectable
         {
             analogPins.Add(new Pin(i));
         }
-    }
-
-    public void OnConnected(int pin, IConnectable otherComponent, int otherPin)
-    {
-        Debug.Log($"Arduino pin {pin} connected to {otherComponent.GetName()} pin {otherPin}");
-
-        if (pin >= 0 && pin < digitalPins.Count)
-        {
-            digitalPins[pin].isConnected = true;
-            digitalPins[pin].connectedComponent = otherComponent;
-            ConnectComponent(pin, otherComponent);
-        }
-
-        if (!connections.ContainsKey(pin))
-            connections[pin] = new List<WireConnection>();
-
-        connections[pin].Add(new WireConnection
-        {
-            sourcePin = pin,
-            targetComponent = otherComponent
-        });
-    }
-
-    public void OnDisconnected(int pin)
-    {
-        Debug.Log($"Arduino pin {pin} disconnected");
-
-        if (pin >= 0 && pin < digitalPins.Count)
-        {
-            digitalPins[pin].isConnected = false;
-            digitalPins[pin].connectedComponent = null;
-        }
-
-        if (connections.ContainsKey(pin))
-            connections[pin].Clear();
-    }
-
-    public bool CanConnectTo(int pin, IConnectable otherComponent, int otherPin)
-    {
-        return pin >= 0 && pin < digitalPins.Count;
     }
 
     public bool DigitalWrite(int pin, int value)
@@ -193,6 +180,12 @@ public class VirtualArduino : MonoBehaviour, IConnectable
         if (Mathf.Abs(targetPin.voltage - newVoltage) < 0.01f)
         {
             Debug.Log($"Pin {pin} already at value {value}, but processing anyway");
+        }
+
+        if (!CheckCurrentLimit(pin, value))
+        {
+            Debug.LogWarning($"Current limit exceeded on pin {pin}, limiting output");
+            return false;
         }
 
         targetPin.voltage = newVoltage;
@@ -245,6 +238,8 @@ public class VirtualArduino : MonoBehaviour, IConnectable
         float voltage = Mathf.Clamp(value, 0f, 255f) * Pin.OPERATING_VOLTAGE / 255f;
         targetPin.voltage = voltage;
         OnAnalogWrite?.Invoke(pin, voltage);
+
+        UpdateConnectedComponents(pin, voltage > 0 ? 1 : 0);
         return true;
     }
 
@@ -419,6 +414,7 @@ public class VirtualArduino : MonoBehaviour, IConnectable
         targetPin.voltage = voltage;
         OnAnalogWrite?.Invoke(pin, voltage);
 
+        UpdateConnectedComponents(pin, voltage > 0 ? 1 : 0);
         return true;
     }
 }

@@ -13,8 +13,7 @@ GameObject:
   - component: {fileID: 624799596646913803}
   - component: {fileID: 8601181847160408018}
   - component: {fileID: 4548168149845510677}
-  - component: {fileID: 1965077602612840522}
-  - component: {fileID: 6404983383042853973}
+  - component: {fileID: 6282060533231770937}
   m_Layer: 6
   m_Name: LED_5mm
   m_TagString: Untagged
@@ -112,7 +111,7 @@ CapsuleCollider:
   m_Radius: 0.5000001
   m_Height: 2
   m_Direction: 1
-  m_Center: {x: 0.000000059604645, y: 0, z: -0.00000008940697}
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!114 &4548168149845510677
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -127,25 +126,27 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   isActive: 1
   resistance: 220
-  currentVoltage: 0
-  currentCurrent: 0
-  canBurnOut: 1
   maxVoltage: 6
   maxCurrent: 0.02
   requiresPolarity: 1
-  connectedArduino: {fileID: 0}
+  canBurnOut: 1
   positivePin: -1
   negativePin: -1
+  connectedArduino: {fileID: 0}
+  currentVoltage: 0
+  currentDraw: 0
+  currentCurrent: 0
+  voltageDrop: 0
   ledColor: {r: 1, g: 0.0781779, b: 0, a: 1}
   forwardVoltage: 2.1
-  intensity: 0
+  maxOperatingCurrent: 0.02
   maxEmissionIntensity: 2
   maxLightIntensity: 2
-  maxOperatingVoltage: 5
-  maxOperatingCurrent: 0.02
-  bloomEffect: 1.5
-  sizeIncrease: 0.3
---- !u!114 &1965077602612840522
+  warningColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  errorColor: {r: 1, g: 0, b: 0, a: 1}
+  successColor: {r: 0, g: 1, b: 0, a: 1}
+  statusIndicator: {fileID: 0}
+--- !u!114 &6282060533231770937
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -154,26 +155,10 @@ MonoBehaviour:
   m_GameObject: {fileID: 4178249768967591038}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d24487f7a7d9423479091af9f4009e88, type: 3}
+  m_Script: {fileID: 11500000, guid: 439d4c381b058fe43a6052a935852dda, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  dragSpeed: 10
-  rotationSpeed: 100
-  useGrid: 1
-  gridSize: 0.25
-  liftHeight: 0.1
---- !u!114 &6404983383042853973
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4178249768967591038}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ef939aec8d563504db2205afc5bb1515, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  canDrag: 1
 --- !u!1 &6879149594812909412
 GameObject:
   m_ObjectHideFlags: 0
@@ -186,7 +171,7 @@ GameObject:
   - component: {fileID: 2982037017228366641}
   - component: {fileID: 2129848492647978355}
   - component: {fileID: 6224061250001957020}
-  - component: {fileID: 138133372604272219}
+  - component: {fileID: 4665554790529146839}
   m_Layer: 3
   m_Name: NegativePin
   m_TagString: Untagged
@@ -278,11 +263,11 @@ CapsuleCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 2
-  m_Radius: 0.5000001
+  m_Radius: 0.2
   m_Height: 2
   m_Direction: 1
-  m_Center: {x: 0.000000059604645, y: 0, z: -0.00000008940697}
---- !u!114 &138133372604272219
+  m_Center: {x: 0, y: 0, z: 0}
+--- !u!114 &4665554790529146839
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -291,16 +276,15 @@ MonoBehaviour:
   m_GameObject: {fileID: 6879149594812909412}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b2cea6f093f52b640874cef4d42bc661, type: 3}
+  m_Script: {fileID: 11500000, guid: c73e289f61738af4e9551d35fd752d01, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  normalMaterial: {fileID: 2100000, guid: d0f2471c0d803094e81705d9e925cd1a, type: 2}
-  highlightMaterial: {fileID: 2100000, guid: 8831934f4227f2447ba2db88ef746033, type: 2}
-  connectedMaterial: {fileID: 2100000, guid: 8bb9c65e205fc094aa72edf4401c7018, type: 2}
   pinNumber: 2
   pinMode: 0
-  isConnected: 0
-  parentMonoBehaviour: {fileID: 0}
+  isGroundPin: 0
+  isPowerPin: 0
+  normalColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  connectedColor: {r: 0, g: 1, b: 0, a: 1}
 --- !u!1 &7710130257656390635
 GameObject:
   m_ObjectHideFlags: 0
@@ -313,7 +297,7 @@ GameObject:
   - component: {fileID: 495711842046403207}
   - component: {fileID: 386983165086447976}
   - component: {fileID: 7430350344026295163}
-  - component: {fileID: 3207293892208637625}
+  - component: {fileID: 4687299909234424318}
   m_Layer: 3
   m_Name: PositivePin
   m_TagString: Untagged
@@ -330,7 +314,7 @@ Transform:
   m_GameObject: {fileID: 7710130257656390635}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.04, y: -1.192, z: 0.25}
+  m_LocalPosition: {x: 0.04, y: -1.27, z: 0.25}
   m_LocalScale: {x: 0.05, y: 0.8, z: 0.05}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -401,15 +385,15 @@ CapsuleCollider:
     serializedVersion: 2
     m_Bits: 0
   m_LayerOverridePriority: 0
-  m_IsTrigger: 1
+  m_IsTrigger: 0
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 2
-  m_Radius: 0.5000001
+  m_Radius: 0.2
   m_Height: 2
   m_Direction: 1
-  m_Center: {x: 0.000000059604645, y: 0, z: -0.00000008940697}
---- !u!114 &3207293892208637625
+  m_Center: {x: 0, y: 0, z: 0}
+--- !u!114 &4687299909234424318
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -418,16 +402,15 @@ MonoBehaviour:
   m_GameObject: {fileID: 7710130257656390635}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b2cea6f093f52b640874cef4d42bc661, type: 3}
+  m_Script: {fileID: 11500000, guid: c73e289f61738af4e9551d35fd752d01, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  normalMaterial: {fileID: 2100000, guid: d0f2471c0d803094e81705d9e925cd1a, type: 2}
-  highlightMaterial: {fileID: 2100000, guid: 8831934f4227f2447ba2db88ef746033, type: 2}
-  connectedMaterial: {fileID: 2100000, guid: 8bb9c65e205fc094aa72edf4401c7018, type: 2}
   pinNumber: 1
   pinMode: 0
-  isConnected: 0
-  parentMonoBehaviour: {fileID: 0}
+  isGroundPin: 0
+  isPowerPin: 0
+  normalColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  connectedColor: {r: 0, g: 1, b: 0, a: 1}
 --- !u!1 &9054907014111307589
 GameObject:
   m_ObjectHideFlags: 0

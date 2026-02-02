@@ -32,7 +32,7 @@ public class AutoGroundConnector : MonoBehaviour
             Debug.Log($"Auto-connecting {targetComponent.name} to Arduino GND pin {groundPin.pinNumber}");
 
             // Создаем соединение через ConnectionManager
-            if (ConnectionManager.Instance != null)
+            if (SuperSimpleConnectionManager.Instance != null)
             {
                 IConnectable componentConnectable = targetComponent as IConnectable;
                 IConnectable groundConnectable = groundPin as IConnectable;
@@ -40,8 +40,8 @@ public class AutoGroundConnector : MonoBehaviour
                 if (componentConnectable != null && groundConnectable != null)
                 {
                     // Предполагаем, что отрицательный пин компонента = 2
-                    ConnectionManager.Instance.StartConnection(componentConnectable, 2);
-                    ConnectionManager.Instance.CompleteConnection(groundConnectable, groundPin.pinNumber);
+                    SuperSimpleConnectionManager.Instance.StartConnection(componentConnectable, 2);
+                    SuperSimpleConnectionManager.Instance.CompleteConnection(groundConnectable, groundPin.pinNumber);
 
                     // Обновляем состояние компонента
                     targetComponent.negativePin = groundPin.pinNumber;

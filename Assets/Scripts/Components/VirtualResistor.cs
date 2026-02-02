@@ -136,6 +136,7 @@ public class VirtualResistor : CircuitComponent
     {
         base.OnVoltageChanged(voltage);
 
+        // В CircuitComponent теперь есть поле currentCurrent
         if (currentCurrent > 0.5f)
         {
             Renderer rend = GetComponent<Renderer>();

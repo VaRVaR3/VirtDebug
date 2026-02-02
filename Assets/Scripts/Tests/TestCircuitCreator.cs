@@ -30,19 +30,19 @@ public class TestCircuitCreator : MonoBehaviour
         arduino.SetPinMode(testPin, PinMode.Output);
 
         // 3. Создаем соединения через ConnectionManager
-        if (ConnectionManager.Instance != null)
+        if (SuperSimpleConnectionManager.Instance != null)
         {
             IConnectable arduinoConn = arduino as IConnectable;
             IConnectable ledConn = led as IConnectable;
             IConnectable groundConn = ground as IConnectable;
 
             // Arduino → LED (анод)
-            ConnectionManager.Instance.StartConnection(arduinoConn, testPin);
-            ConnectionManager.Instance.CompleteConnection(ledConn, 1); // пин 1 LED
+            SuperSimpleConnectionManager.Instance.StartConnection(arduinoConn, testPin);
+            SuperSimpleConnectionManager.Instance.CompleteConnection(ledConn, 1); // пин 1 LED
 
             // LED → Ground (катод)
-            ConnectionManager.Instance.StartConnection(ledConn, 2); // пин 2 LED
-            ConnectionManager.Instance.CompleteConnection(groundConn, 0);
+            SuperSimpleConnectionManager.Instance.StartConnection(ledConn, 2); // пин 2 LED
+            SuperSimpleConnectionManager.Instance.CompleteConnection(groundConn, 0);
         }
 
         Debug.Log("Test circuit created. LED should work only when circuit is complete.");

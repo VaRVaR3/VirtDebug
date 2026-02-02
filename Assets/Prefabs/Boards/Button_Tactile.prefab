@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 3002492102153707278}
   - component: {fileID: 3017342114887213976}
   - component: {fileID: 4975446228029703099}
-  - component: {fileID: 4909151797584414892}
+  - component: {fileID: 7159964549125220362}
   m_Layer: 3
   m_Name: Cube (2)
   m_TagString: Untagged
@@ -106,7 +106,7 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 1, y: 1, z: 1}
   m_Center: {x: 0, y: 0, z: 0}
---- !u!114 &4909151797584414892
+--- !u!114 &7159964549125220362
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -115,15 +115,15 @@ MonoBehaviour:
   m_GameObject: {fileID: 2686164772787047320}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b2cea6f093f52b640874cef4d42bc661, type: 3}
+  m_Script: {fileID: 11500000, guid: c73e289f61738af4e9551d35fd752d01, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  normalMaterial: {fileID: 2100000, guid: d0f2471c0d803094e81705d9e925cd1a, type: 2}
-  highlightMaterial: {fileID: 2100000, guid: 8831934f4227f2447ba2db88ef746033, type: 2}
-  connectedMaterial: {fileID: 2100000, guid: 8bb9c65e205fc094aa72edf4401c7018, type: 2}
   pinNumber: 3
-  pinMode: 0
-  isConnected: 0
+  pinMode: 1
+  isGroundPin: 0
+  isPowerPin: 0
+  normalColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  connectedColor: {r: 0, g: 1, b: 0, a: 1}
 --- !u!1 &3448764972660309758
 GameObject:
   m_ObjectHideFlags: 0
@@ -137,7 +137,7 @@ GameObject:
   - component: {fileID: 7397690594287419594}
   - component: {fileID: 8612883778588777262}
   - component: {fileID: -4818795049331156458}
-  - component: {fileID: 7945007365666182995}
+  - component: {fileID: 1257215569929353361}
   m_Layer: 6
   m_Name: Button_Tactile
   m_TagString: Untagged
@@ -248,18 +248,28 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: be895837c8b50c1458927e80d0dd144f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  isActive: 1
   resistance: 100
   maxVoltage: 5
   maxCurrent: 0.1
   requiresPolarity: 0
-  isActive: 1
+  canBurnOut: 0
   positivePin: -1
   negativePin: -1
   connectedArduino: {fileID: 0}
+  currentVoltage: 0
+  currentDraw: 0
+  currentCurrent: 0
+  voltageDrop: 0
   pressDepth: 0.1
   normalColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   pressedColor: {r: 0, g: 1, b: 0, a: 1}
---- !u!114 &7945007365666182995
+  notConnectedColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  errorColor: {r: 1, g: 0, b: 0, a: 1}
+  statusIndicator: {fileID: 0}
+  contactResistance: 0.01
+  openResistance: 1000000
+--- !u!114 &1257215569929353361
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -268,16 +278,10 @@ MonoBehaviour:
   m_GameObject: {fileID: 3448764972660309758}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d24487f7a7d9423479091af9f4009e88, type: 3}
+  m_Script: {fileID: 11500000, guid: 439d4c381b058fe43a6052a935852dda, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  snapDistance: 0.5
-  snapLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  useGridSnapping: 1
-  gridSize: 0.25
-  liftHeight: 0.1
+  canDrag: 1
 --- !u!1 &4935568367119153127
 GameObject:
   m_ObjectHideFlags: 0
@@ -290,7 +294,7 @@ GameObject:
   - component: {fileID: 5680025403541254832}
   - component: {fileID: 6361307933279926433}
   - component: {fileID: 4904245114988743217}
-  - component: {fileID: 3512315725102245426}
+  - component: {fileID: 4326304104971608037}
   m_Layer: 3
   m_Name: Cube (1)
   m_TagString: Untagged
@@ -384,7 +388,7 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 1, y: 1, z: 1}
   m_Center: {x: 0, y: 0, z: 0}
---- !u!114 &3512315725102245426
+--- !u!114 &4326304104971608037
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -393,15 +397,15 @@ MonoBehaviour:
   m_GameObject: {fileID: 4935568367119153127}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b2cea6f093f52b640874cef4d42bc661, type: 3}
+  m_Script: {fileID: 11500000, guid: c73e289f61738af4e9551d35fd752d01, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  normalMaterial: {fileID: 2100000, guid: d0f2471c0d803094e81705d9e925cd1a, type: 2}
-  highlightMaterial: {fileID: 2100000, guid: 8831934f4227f2447ba2db88ef746033, type: 2}
-  connectedMaterial: {fileID: 2100000, guid: 8bb9c65e205fc094aa72edf4401c7018, type: 2}
   pinNumber: 2
-  pinMode: 0
-  isConnected: 0
+  pinMode: 1
+  isGroundPin: 0
+  isPowerPin: 0
+  normalColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  connectedColor: {r: 0, g: 1, b: 0, a: 1}
 --- !u!1 &5440768126375027234
 GameObject:
   m_ObjectHideFlags: 0
@@ -519,7 +523,7 @@ GameObject:
   - component: {fileID: 4574015249534946711}
   - component: {fileID: 3083788796991486191}
   - component: {fileID: 1243172269535902109}
-  - component: {fileID: 6286395174497373665}
+  - component: {fileID: 9020475245518348825}
   m_Layer: 3
   m_Name: Cube
   m_TagString: Untagged
@@ -613,7 +617,7 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 1, y: 1, z: 1}
   m_Center: {x: 0, y: 0, z: 0}
---- !u!114 &6286395174497373665
+--- !u!114 &9020475245518348825
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -622,15 +626,15 @@ MonoBehaviour:
   m_GameObject: {fileID: 6257419338358645838}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b2cea6f093f52b640874cef4d42bc661, type: 3}
+  m_Script: {fileID: 11500000, guid: c73e289f61738af4e9551d35fd752d01, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  normalMaterial: {fileID: 2100000, guid: d0f2471c0d803094e81705d9e925cd1a, type: 2}
-  highlightMaterial: {fileID: 2100000, guid: 8831934f4227f2447ba2db88ef746033, type: 2}
-  connectedMaterial: {fileID: 2100000, guid: 8bb9c65e205fc094aa72edf4401c7018, type: 2}
   pinNumber: 1
-  pinMode: 0
-  isConnected: 0
+  pinMode: 1
+  isGroundPin: 0
+  isPowerPin: 0
+  normalColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  connectedColor: {r: 0, g: 1, b: 0, a: 1}
 --- !u!1 &7766983234514977179
 GameObject:
   m_ObjectHideFlags: 0
@@ -643,7 +647,7 @@ GameObject:
   - component: {fileID: 2843889848532138259}
   - component: {fileID: 2394776940625040747}
   - component: {fileID: 7321065612466457507}
-  - component: {fileID: 1226659534858223933}
+  - component: {fileID: 7992782861146878245}
   m_Layer: 3
   m_Name: Cube (3)
   m_TagString: Untagged
@@ -737,7 +741,7 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 1, y: 1, z: 1}
   m_Center: {x: 0, y: 0, z: 0}
---- !u!114 &1226659534858223933
+--- !u!114 &7992782861146878245
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -746,12 +750,12 @@ MonoBehaviour:
   m_GameObject: {fileID: 7766983234514977179}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b2cea6f093f52b640874cef4d42bc661, type: 3}
+  m_Script: {fileID: 11500000, guid: c73e289f61738af4e9551d35fd752d01, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  normalMaterial: {fileID: 2100000, guid: d0f2471c0d803094e81705d9e925cd1a, type: 2}
-  highlightMaterial: {fileID: 2100000, guid: 8831934f4227f2447ba2db88ef746033, type: 2}
-  connectedMaterial: {fileID: 2100000, guid: 8bb9c65e205fc094aa72edf4401c7018, type: 2}
   pinNumber: 4
-  pinMode: 0
-  isConnected: 0
+  pinMode: 1
+  isGroundPin: 0
+  isPowerPin: 0
+  normalColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  connectedColor: {r: 0, g: 1, b: 0, a: 1}

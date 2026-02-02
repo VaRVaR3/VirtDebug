@@ -1,7 +1,7 @@
 using UnityEngine;
 using System.Collections;
 
-public class VirtualButton : CircuitComponent
+public class VirtualButton : CircuitComponent, IConnectable
 {
     [Header("Button Settings")]
     public float pressDepth = 0.1f;
@@ -35,7 +35,6 @@ public class VirtualButton : CircuitComponent
         buttonCollider = GetComponent<Collider>();
         originalPosition = transform.position;
 
-        // Инициализируем индикатор статуса
         if (statusIndicator == null)
         {
             GameObject indicator = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -49,7 +48,6 @@ public class VirtualButton : CircuitComponent
         statusRenderer = statusIndicator.GetComponent<Renderer>();
         UpdateStatusIndicator();
 
-        // Настройки компонента
         resistance = openResistance;
         maxVoltage = 5.0f;
         maxCurrent = 0.1f;
@@ -57,8 +55,6 @@ public class VirtualButton : CircuitComponent
 
         if (buttonRenderer != null)
             buttonRenderer.material.color = normalColor;
-
-        Debug.Log($"Button {name} initialized");
     }
 
     void OnMouseDown()
@@ -93,13 +89,11 @@ public class VirtualButton : CircuitComponent
 
         isPressed = true;
 
-        // Визуальное нажатие
         if (buttonRenderer != null)
             buttonRenderer.material.color = pressedColor;
 
         transform.position = originalPosition - new Vector3(0, pressDepth, 0);
 
-        // Замыкание цепи
         connectedArduino.DigitalWrite(positivePin, 1);
         Debug.Log($"Button pressed, sending HIGH to pin {positivePin}");
 
@@ -113,13 +107,11 @@ public class VirtualButton : CircuitComponent
 
         isPressed = false;
 
-        // Возврат в исходное состояние
         if (buttonRenderer != null)
             buttonRenderer.material.color = normalColor;
 
         transform.position = originalPosition;
 
-        // Размыкание цепи
         if (positivePin >= 0 && connectedArduino != null)
         {
             connectedArduino.DigitalWrite(positivePin, 0);
@@ -136,7 +128,6 @@ public class VirtualButton : CircuitComponent
         currentStatus = ButtonStatus.Error;
         UpdateStatusIndicator();
 
-        // Мигание при ошибке
         StartCoroutine(ErrorFlash());
     }
 
@@ -183,8 +174,6 @@ public class VirtualButton : CircuitComponent
 
     public override void OnVoltageChanged(float voltage)
     {
-        // Кнопка обычно не реагирует на входящее напряжение
-        // Но можно использовать для обнаружения внешнего питания
         currentVoltage = voltage;
 
         if (voltage > 2.5f && !isPressed)
@@ -195,7 +184,6 @@ public class VirtualButton : CircuitComponent
 
     public override void UpdateComponent()
     {
-        // Тестовое управление с клавиатуры
         if (Input.GetKeyDown(KeyCode.Space) && gameObject.activeInHierarchy)
         {
             PressButton();
@@ -205,7 +193,6 @@ public class VirtualButton : CircuitComponent
             ReleaseButton();
         }
 
-        // Проверяем подключение
         if (connectedArduino == null || positivePin == -1)
         {
             currentStatus = ButtonStatus.NotConnected;
@@ -220,11 +207,57 @@ public class VirtualButton : CircuitComponent
 
     void OnDestroy()
     {
-        // При уничтожении кнопки, отключаем пин
         if (isPressed && positivePin >= 0 && connectedArduino != null)
         {
             connectedArduino.DigitalWrite(positivePin, 0);
         }
+    }
+
+    // ========== IConnectable IMPLEMENTATION (с override) ==========
+
+    public override string GetName()
+    {
+        return name;
+    }
+
+    public override void OnConnected(int pin, IConnectable otherComponent, int otherPin)
+    {
+        Debug.Log($"Button {name} pin {pin} connected to {otherComponent.GetName()}");
+        positivePin = otherPin;
+        if (otherComponent is VirtualArduino arduino)
+            connectedArduino = arduino;
+    }
+
+    public override void OnDisconnected(int pin)
+    {
+        Debug.Log($"Button {name} pin {pin} disconnected");
+        positivePin = -1;
+        connectedArduino = null;
+    }
+
+    public override Vector3 GetPinPosition(int pin)
+    {
+        // Пробуем найти UltraSimplePin
+        UltraSimplePin[] ultraPins = GetComponentsInChildren<UltraSimplePin>();
+        foreach (var pinObj in ultraPins)
+        {
+            if (pinObj.pinNumber == pin)
+                return pinObj.transform.position;
+        }
+
+        // Если UltraSimplePin не найден, пробуем найти PinHighlighter
+        PinHighlighter[] oldPins = GetComponentsInChildren<PinHighlighter>();
+        foreach (var pinObj in oldPins)
+        {
+            if (pinObj.pinNumber == pin)
+                return pinObj.transform.position;
+        }
+        return transform.position;
+    }
+
+    public override bool CanConnectTo(int pin, IConnectable otherComponent, int otherPin)
+    {
+        return true;
     }
 
     [ContextMenu("Тест кнопки")]
@@ -249,11 +282,10 @@ public class VirtualButton : CircuitComponent
     }
 }
 
-// Статусы кнопки
 public enum ButtonStatus
 {
-    NotConnected, // Не подключена
-    Ready,        // Готова к нажатию
-    Pressed,      // Нажата
-    Error         // Ошибка
+    NotConnected,
+    Ready,
+    Pressed,
+    Error
 }

@@ -1,90 +1,159 @@
-using UnityEngine;
+п»їusing UnityEngine;
 
+[RequireComponent(typeof(LineRenderer))]
 public class WireVisual : MonoBehaviour
 {
+    [Header("Connection")]
     public IConnectable sourceComponent;
     public int sourcePin;
     public IConnectable targetComponent;
     public int targetPin;
+
+    [Header("Style")]
     public Color wireColor = Color.red;
+    public float wireThickness = 0.02f;
+
+    [Header("Shape")]
+    public bool useCurvedShape = true;
+    public float curveHeight = 0.1f;
 
     private LineRenderer lineRenderer;
-    private Vector3[] positions = new Vector3[4];
-    private float wireThickness = 0.02f;
+    private Vector3[] positions4 = new Vector3[4];
+
+    void Awake()
+    {
+        lineRenderer = GetComponent<LineRenderer>();
+        if (lineRenderer == null)
+            lineRenderer = gameObject.AddComponent<LineRenderer>();
+    }
 
     void Start()
     {
-        // Используем LineRenderer вместо Cylinder для гибкости
-        lineRenderer = gameObject.AddComponent<LineRenderer>();
-        lineRenderer.startWidth = wireThickness;
-        lineRenderer.endWidth = wireThickness;
-
-        // Создаем материал для провода
-        Material wireMat = new Material(Shader.Find("Standard"));
-        wireMat.color = wireColor;
-        lineRenderer.material = wireMat;
-
-        lineRenderer.positionCount = 4;
-        lineRenderer.useWorldSpace = true;
-
-        UpdateWirePositions();
+        ApplyStyle();
+        ForceUpdateWire();
     }
 
     void Update()
     {
-        // Проверяем, что компоненты еще существуют
         if (sourceComponent == null || targetComponent == null)
         {
-            Destroy(gameObject);
+            // РќРµ СѓРЅРёС‡С‚РѕР¶Р°РµРј СЃСЂР°Р·Сѓ вЂ” С‡С‚РѕР±С‹ РЅРµ Р»РѕРІРёС‚СЊ "РјРёРіР°СЋС‰РёР№ null" РїСЂРё СѓРґР°Р»РµРЅРёРё РѕР±СЉРµРєС‚РѕРІ
             return;
         }
 
         UpdateWirePositions();
     }
 
-    // НОВЫЙ МЕТОД: Публичный метод для принудительного обновления
-    public void ForceUpdateWire()
+    private void ApplyStyle()
     {
-        UpdateWirePositions();
+        if (lineRenderer == null) return;
+
+        lineRenderer.startWidth = wireThickness;
+        lineRenderer.endWidth = wireThickness;
+
+        // РЈР»СѓС‡С€Р°РµРј РІРЅРµС€РЅРёР№ РІРёРґ
+        lineRenderer.useWorldSpace = true;
+        lineRenderer.numCapVertices = 6;
+        lineRenderer.numCornerVertices = 6;
+        lineRenderer.alignment = LineAlignment.View;
+
+        // РњР°С‚РµСЂРёР°Р» СѓСЃС‚РѕР№С‡РёРІС‹Р№ Рє URP/Built-in
+        if (lineRenderer.material == null)
+            lineRenderer.material = CreateLineMaterial(wireColor);
+        else
+            lineRenderer.material.color = wireColor;
+
+        // РќР° РІСЃСЏРєРёР№ СЃР»СѓС‡Р°Р№ emission
+        if (lineRenderer.material != null && lineRenderer.material.HasProperty("_EmissionColor"))
+        {
+            lineRenderer.material.EnableKeyword("_EMISSION");
+            lineRenderer.material.SetColor("_EmissionColor", wireColor * 0.5f);
+        }
     }
 
-    private void UpdateWirePositions()
+    private Material CreateLineMaterial(Color color)
     {
-        if (sourceComponent != null && targetComponent != null)
+        Shader shader =
+            Shader.Find("Sprites/Default") ??
+            Shader.Find("Universal Render Pipeline/Unlit") ??
+            Shader.Find("Unlit/Color") ??
+            Shader.Find("Standard");
+
+        if (shader == null)
         {
-            Vector3 startPos = sourceComponent.GetPinPosition(sourcePin);
-            Vector3 endPos = targetComponent.GetPinPosition(targetPin);
-
-            // Создаем изогнутый провод (кривая Безье)
-            positions[0] = startPos;
-            positions[1] = startPos + (endPos - startPos) * 0.25f + Vector3.up * 0.1f;
-            positions[2] = startPos + (endPos - startPos) * 0.75f + Vector3.up * 0.1f;
-            positions[3] = endPos;
-
-            lineRenderer.SetPositions(positions);
+            Debug.LogError("вќЊ WireVisual: No suitable shader found!");
+            shader = Shader.Find("Hidden/InternalErrorShader");
         }
+
+        Material mat = new Material(shader);
+        mat.color = color;
+        return mat;
+    }
+
+    // РћСЃРЅРѕРІРЅРѕР№ РјРµС‚РѕРґ РѕР±РЅРѕРІР»РµРЅРёСЏ РїРѕР·РёС†РёР№
+    public void UpdateWirePositions()
+    {
+        if (lineRenderer == null) return;
+        if (sourceComponent == null || targetComponent == null) return;
+
+        Vector3 startPos = sourceComponent.GetPinPosition(sourcePin);
+        Vector3 endPos = targetComponent.GetPinPosition(targetPin);
+
+        if (!useCurvedShape)
+        {
+            lineRenderer.positionCount = 2;
+            lineRenderer.SetPosition(0, startPos);
+            lineRenderer.SetPosition(1, endPos);
+            return;
+        }
+
+        // РўРІРѕСЏ 4-С‚РѕС‡РµС‡РЅР°СЏ С„РѕСЂРјР°
+        positions4[0] = startPos;
+        positions4[1] = startPos + (endPos - startPos) * 0.25f + Vector3.up * curveHeight;
+        positions4[2] = startPos + (endPos - startPos) * 0.75f + Vector3.up * curveHeight;
+        positions4[3] = endPos;
+
+        lineRenderer.positionCount = 4;
+        lineRenderer.SetPositions(positions4);
+    }
+
+    // РњРµС‚РѕРґ РґР»СЏ РїСЂРёРЅСѓРґРёС‚РµР»СЊРЅРѕРіРѕ РѕР±РЅРѕРІР»РµРЅРёСЏ (РїРѕРґРґРµСЂР¶РєР° СЃС‚Р°СЂРѕРіРѕ РєРѕРґР°)
+    public void ForceUpdateWire()
+    {
+        ApplyStyle();
+        UpdateWirePositions();
     }
 
     void OnDestroy()
     {
-        // При удалении провода обновляем состояние пинов
-        UpdatePinVisualState(sourceComponent, sourcePin, false);
-        UpdatePinVisualState(targetComponent, targetPin, false);
+        UpdatePinState(sourceComponent, sourcePin, false);
+        UpdatePinState(targetComponent, targetPin, false);
     }
 
-    private void UpdatePinVisualState(IConnectable component, int pin, bool connected)
+    private void UpdatePinState(IConnectable component, int pin, bool connected)
     {
         if (component == null) return;
 
         MonoBehaviour monoComponent = component as MonoBehaviour;
         if (monoComponent != null)
         {
-            PinHighlighter[] pins = monoComponent.GetComponentsInChildren<PinHighlighter>();
-            foreach (PinHighlighter pinHighlighter in pins)
+            UltraSimplePin[] ultraPins = monoComponent.GetComponentsInChildren<UltraSimplePin>();
+            foreach (var pinObj in ultraPins)
             {
-                if (pinHighlighter != null && pinHighlighter.pinNumber == pin)
+                if (pinObj != null && pinObj.pinNumber == pin)
                 {
-                    pinHighlighter.SetConnected(connected);
+                    pinObj.SetConnected(connected);
+                    return;
+                }
+            }
+
+            PinHighlighter[] oldPins = monoComponent.GetComponentsInChildren<PinHighlighter>();
+            foreach (var pinObj in oldPins)
+            {
+                if (pinObj != null && pinObj.pinNumber == pin)
+                {
+                    pinObj.SetConnected(connected);
+                    return;
                 }
             }
         }

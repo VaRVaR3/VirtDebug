@@ -26,7 +26,7 @@ public class ConnectionDebugHelper : MonoBehaviour
         Debug.Log("=== CONNECTION SYSTEM TEST ===");
 
         // Проверяем основные компоненты
-        if (ConnectionManager.Instance == null)
+        if (SuperSimpleConnectionManager.Instance == null)
         {
             Debug.LogError("❌ ConnectionManager not found!");
             return;
@@ -88,11 +88,11 @@ public class ConnectionDebugHelper : MonoBehaviour
         }
 
         // Принудительно начинаем соединение
-        ConnectionManager.Instance.StartConnection(arduino, 13);
+        SuperSimpleConnectionManager.Instance.StartConnection(arduino, 13);
         Debug.Log("✅ Started connection from Arduino pin 13");
 
         // Принудительно завершаем соединение
-        ConnectionManager.Instance.CompleteConnection(led, 1);
+        SuperSimpleConnectionManager.Instance.CompleteConnection(led, 1);
         Debug.Log("✅ Completed connection to LED pin 1");
 
         // Включаем LED
@@ -103,25 +103,25 @@ public class ConnectionDebugHelper : MonoBehaviour
 
     void ShowConnectionStatus()
     {
-        if (ConnectionManager.Instance == null)
+        if (SuperSimpleConnectionManager.Instance == null)
         {
             Debug.Log("ConnectionManager is NULL");
             return;
         }
 
         Debug.Log($"=== CONNECTION STATUS ===");
-        Debug.Log($"Is connecting: {ConnectionManager.Instance.isConnecting}");
-        Debug.Log($"Active connections: {ConnectionManager.Instance.GetConnections().Count}");
+        Debug.Log($"Is connecting: {SuperSimpleConnectionManager.Instance.isConnecting}");
+        Debug.Log($"Active connections: {SuperSimpleConnectionManager.Instance.GetConnections().Count}");
 
-        if (ConnectionManager.Instance.isConnecting)
+        if (SuperSimpleConnectionManager.Instance.isConnecting)
         {
-            var component = ConnectionManager.Instance.GetConnectingComponent();
-            var pin = ConnectionManager.Instance.GetConnectingPin();
+            var component = SuperSimpleConnectionManager.Instance.GetConnectingComponent();
+            var pin = SuperSimpleConnectionManager.Instance.GetConnectingPin();
             Debug.Log($"Currently connecting: {component?.GetName()} pin {pin}");
         }
 
         // Показываем все соединения
-        var connections = ConnectionManager.Instance.GetConnections();
+        var connections = SuperSimpleConnectionManager.Instance.GetConnections();
         for (int i = 0; i < connections.Count; i++)
         {
             var conn = connections[i];
@@ -140,15 +140,15 @@ public class ConnectionDebugHelper : MonoBehaviour
         GUI.Label(new Rect(10, y, 300, 25), "F6 - Force Connect LED", style); y += 25;
         GUI.Label(new Rect(10, y, 300, 25), "F7 - Show Connection Status", style); y += 25;
 
-        if (ConnectionManager.Instance != null)
+        if (SuperSimpleConnectionManager.Instance != null)
         {
-            string status = ConnectionManager.Instance.isConnecting ? "CONNECTING" : "IDLE";
+            string status = SuperSimpleConnectionManager.Instance.isConnecting ? "CONNECTING" : "IDLE";
             GUI.Label(new Rect(10, y, 300, 25), $"Status: {status}", style); y += 25;
 
-            if (ConnectionManager.Instance.isConnecting)
+            if (SuperSimpleConnectionManager.Instance.isConnecting)
             {
-                var component = ConnectionManager.Instance.GetConnectingComponent();
-                var pin = ConnectionManager.Instance.GetConnectingPin();
+                var component = SuperSimpleConnectionManager.Instance.GetConnectingComponent();
+                var pin = SuperSimpleConnectionManager.Instance.GetConnectingPin();
                 GUI.Label(new Rect(10, y, 300, 25),
                     $"From: {component?.GetName()} pin {pin}", style);
             }

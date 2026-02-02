@@ -2,12 +2,12 @@
 using System.Collections;
 using System.Collections.Generic;
 
-public class VirtualLED : CircuitComponent, IConnectable
+public class VirtualLED : CircuitComponent
 {
     [Header("LED Physical Properties")]
     public Color ledColor = Color.red;
     public float forwardVoltage = 2.1f;
-    public float maxOperatingCurrent = 0.02f; // Переименовано из maxCurrent
+    public float maxOperatingCurrent = 0.02f;
 
     [Header("Visual Settings")]
     public float maxEmissionIntensity = 3f;
@@ -19,19 +19,24 @@ public class VirtualLED : CircuitComponent, IConnectable
     public Color successColor = Color.green;
     public GameObject statusIndicator;
 
-    // Визуальные компоненты
     private Renderer ledRenderer;
     private Light ledLight;
     private Material emissionMaterial;
     private float currentIntensity = 0f;
 
-    // Статус цепи
     private LEDStatus currentStatus = LEDStatus.NotConnected;
     private List<string> statusMessages = new List<string>();
     private Renderer statusRenderer;
 
-    // Дополнительные свойства для доступа
     public float intensity { get { return currentIntensity; } }
+
+    // ===== NEW: реальные связи =====
+    // pin 1 = анод (+), pin 2 = катод (-) (зафиксируем это как правило)
+    private IConnectable anodeConnectedTo;
+    private int anodeConnectedPin = -1;
+
+    private IConnectable cathodeConnectedTo;
+    private int cathodeConnectedPin = -1;
 
     void Start()
     {
@@ -43,7 +48,6 @@ public class VirtualLED : CircuitComponent, IConnectable
         ledRenderer = GetComponentInChildren<Renderer>();
         ledLight = GetComponentInChildren<Light>();
 
-        // Инициализируем индикатор статуса
         if (statusIndicator == null)
         {
             GameObject indicator = GameObject.CreatePrimitive(PrimitiveType.Sphere);
@@ -57,21 +61,25 @@ public class VirtualLED : CircuitComponent, IConnectable
         statusRenderer = statusIndicator.GetComponent<Renderer>();
         UpdateStatusIndicator();
 
-        // Настройки компонента
         resistance = 220f;
-        base.maxVoltage = 5.0f; // Используем base для доступа к родительскому
+        base.maxVoltage = 5.0f;
         requiresPolarity = true;
         canBurnOut = true;
 
-        // Создаём материал со свечением
         if (ledRenderer != null)
         {
-            emissionMaterial = new Material(Shader.Find("Standard"));
+            // NOTE: если URP и Standard = null, лучше поменять как для проводов,
+            // но пока оставим, это не блокирует соединения.
+            Shader s = Shader.Find("Standard") ?? Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Sprites/Default");
+            emissionMaterial = new Material(s);
             emissionMaterial.color = ledColor;
-            emissionMaterial.EnableKeyword("_EMISSION");
-            emissionMaterial.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+            if (emissionMaterial.HasProperty("_EmissionColor"))
+            {
+                emissionMaterial.EnableKeyword("_EMISSION");
+                emissionMaterial.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+                emissionMaterial.SetColor("_EmissionColor", Color.black);
+            }
             ledRenderer.material = emissionMaterial;
-            emissionMaterial.SetColor("_EmissionColor", Color.black);
         }
 
         if (ledLight != null)
@@ -81,7 +89,7 @@ public class VirtualLED : CircuitComponent, IConnectable
             ledLight.enabled = false;
         }
 
-        AddStatusMessage($"LED {name} готов к работе. Подключите анод (+) к цифровому пину, катод (-) к GND.", LEDStatus.Info);
+        AddStatusMessage($"LED {name} готов. Подключите анод (pin 1) к сигналу/питанию, катод (pin 2) к GND.", LEDStatus.Info);
     }
 
     void UpdateStatusIndicator()
@@ -90,35 +98,19 @@ public class VirtualLED : CircuitComponent, IConnectable
 
         switch (currentStatus)
         {
-            case LEDStatus.NotConnected:
-                statusRenderer.material.color = Color.gray;
-                break;
-            case LEDStatus.PartialConnection:
-                statusRenderer.material.color = Color.yellow;
-                break;
-            case LEDStatus.ReversePolarity:
-                statusRenderer.material.color = Color.red;
-                break;
-            case LEDStatus.NoResistor:
-                statusRenderer.material.color = new Color(1f, 0.5f, 0f);
-                break;
+            case LEDStatus.NotConnected: statusRenderer.material.color = Color.gray; break;
+            case LEDStatus.PartialConnection: statusRenderer.material.color = Color.yellow; break;
+            case LEDStatus.ReversePolarity: statusRenderer.material.color = Color.red; break;
+            case LEDStatus.NoResistor: statusRenderer.material.color = new Color(1f, 0.5f, 0f); break;
             case LEDStatus.ShortCircuit:
                 statusRenderer.material.color = Color.red;
                 StartCoroutine(ErrorFlash());
                 break;
             case LEDStatus.OK:
-            case LEDStatus.Success:
-                statusRenderer.material.color = Color.green;
-                break;
-            case LEDStatus.Warning:
-                statusRenderer.material.color = Color.yellow;
-                break;
-            case LEDStatus.Error:
-                statusRenderer.material.color = Color.red;
-                break;
-            case LEDStatus.Info:
-                statusRenderer.material.color = Color.blue;
-                break;
+            case LEDStatus.Success: statusRenderer.material.color = Color.green; break;
+            case LEDStatus.Warning: statusRenderer.material.color = Color.yellow; break;
+            case LEDStatus.Error: statusRenderer.material.color = Color.red; break;
+            case LEDStatus.Info: statusRenderer.material.color = Color.blue; break;
         }
     }
 
@@ -147,26 +139,26 @@ public class VirtualLED : CircuitComponent, IConnectable
 
         if (currentStatus == LEDStatus.PartialConnection)
         {
-            AddStatusMessage("LED подключен только с одной стороны. Нужно подключить и к пину, и к GND.", LEDStatus.Warning);
+            AddStatusMessage("LED подключен только с одной стороны. Нужно подключить и анод, и катод.", LEDStatus.Warning);
             SetIntensity(0f);
             return;
         }
 
         if (currentStatus == LEDStatus.ReversePolarity)
         {
-            AddStatusMessage("LED подключен неправильно! Анод (+) должен быть к пину Arduino, катод (-) к GND.", LEDStatus.Error);
+            AddStatusMessage("LED подключен наоборот! Анод должен быть к сигналу/питанию, катод к GND.", LEDStatus.Error);
             SetIntensity(0f);
             return;
         }
 
         if (currentStatus == LEDStatus.NoResistor)
         {
-            AddStatusMessage("ВНИМАНИЕ: В цепи нет ограничивающего резистора! LED может перегореть.", LEDStatus.Warning);
+            AddStatusMessage("ВНИМАНИЕ: в цепи нет ограничивающего резистора! LED может перегореть.", LEDStatus.Warning);
         }
 
         if (currentStatus == LEDStatus.ShortCircuit)
         {
-            AddStatusMessage("ОШИБКА: Короткое замыкание! LED подключен напрямую к питанию без резистора.", LEDStatus.Error);
+            AddStatusMessage("ОШИБКА: короткое замыкание! LED подключен напрямую без резистора.", LEDStatus.Error);
             BurnOut();
             return;
         }
@@ -175,7 +167,7 @@ public class VirtualLED : CircuitComponent, IConnectable
 
         if (requiresPolarity && voltage < 0)
         {
-            AddStatusMessage("Обратное напряжение! LED защищён, но не будет светиться.", LEDStatus.Warning);
+            AddStatusMessage("Обратное напряжение! LED не будет светиться.", LEDStatus.Warning);
             SetIntensity(0f);
             return;
         }
@@ -188,7 +180,7 @@ public class VirtualLED : CircuitComponent, IConnectable
         }
 
         float effectiveVoltage = voltage - forwardVoltage;
-        float calculatedCurrent = effectiveVoltage / resistance;
+        float calculatedCurrent = effectiveVoltage / Mathf.Max(0.0001f, resistance);
 
         if (calculatedCurrent > maxOperatingCurrent * 1.5f)
         {
@@ -208,61 +200,71 @@ public class VirtualLED : CircuitComponent, IConnectable
 
         if (currentIntensity > 0.1f)
         {
-            AddStatusMessage($"LED работает: {voltage:F2}V, {calculatedCurrent:F3}A, яркость: {currentIntensity:F1}%", LEDStatus.Success);
+            AddStatusMessage($"LED работает: {voltage:F2}V, {calculatedCurrent:F3}A, яркость: {currentIntensity * 100f:F0}%", LEDStatus.Success);
         }
     }
 
     void AnalyzeConnection()
     {
-        if (positivePin == -1 && negativePin == -1)
+        bool anodeConnected = (anodeConnectedTo != null && anodeConnectedPin >= 0);
+        bool cathodeConnected = (cathodeConnectedTo != null && cathodeConnectedPin >= 0);
+
+        if (!anodeConnected && !cathodeConnected)
         {
             currentStatus = LEDStatus.NotConnected;
             return;
         }
 
-        if (positivePin == -1 || negativePin == -1)
+        if (!anodeConnected || !cathodeConnected)
         {
             currentStatus = LEDStatus.PartialConnection;
             return;
         }
 
-        if (connectedArduino != null)
+        // ЛОГИКА ПОЛЯРНОСТИ:
+        // норм: катод (pin2) на GND, анод (pin1) на сигнал/питание
+        bool cathodeIsGround = IsGroundComponent(cathodeConnectedTo);
+        bool anodeIsGround = IsGroundComponent(anodeConnectedTo);
+
+        if (anodeIsGround && !cathodeIsGround)
         {
-            if (positivePin >= 100 && negativePin < 100)
-            {
-                currentStatus = LEDStatus.ReversePolarity;
-                return;
-            }
+            currentStatus = LEDStatus.ReversePolarity;
+            return;
         }
 
+        // Проверка резистора - пока грубо, т.к. сопротивление может быть не только в LED
         if (resistance < 100f)
         {
-            if (resistance < 10f)
-            {
-                currentStatus = LEDStatus.ShortCircuit;
-            }
-            else
-            {
-                currentStatus = LEDStatus.NoResistor;
-            }
+            currentStatus = (resistance < 10f) ? LEDStatus.ShortCircuit : LEDStatus.NoResistor;
             return;
         }
 
         currentStatus = LEDStatus.OK;
     }
 
+    private bool IsGroundComponent(IConnectable comp)
+    {
+        if (comp == null) return false;
+
+        MonoBehaviour m = comp as MonoBehaviour;
+        if (m == null) return false;
+
+        if (m.GetComponent<ArduinoGroundPin>() != null) return true;
+        if (m.name.ToUpper().Contains("GND")) return true;
+        return false;
+    }
+
     void SetIntensity(float intensity)
     {
         currentIntensity = Mathf.Clamp01(intensity);
 
-        if (emissionMaterial != null)
+        if (emissionMaterial != null && emissionMaterial.HasProperty("_EmissionColor"))
         {
             Color emissionColor = ledColor * currentIntensity * maxEmissionIntensity;
             emissionMaterial.SetColor("_EmissionColor", emissionColor);
 
-            if (Application.isPlaying)
+            if (Application.isPlaying && ledRenderer != null)
             {
-                // Используем новый API вместо старого DynamicGI
                 ledRenderer.UpdateGIMaterials();
             }
         }
@@ -290,26 +292,16 @@ public class VirtualLED : CircuitComponent, IConnectable
 
         switch (status)
         {
-            case LEDStatus.Error:
-                Debug.LogError($"LED {name}: {message}");
-                break;
-            case LEDStatus.Warning:
-                Debug.LogWarning($"LED {name}: {message}");
-                break;
-            default:
-                Debug.Log($"LED {name}: {message}");
-                break;
+            case LEDStatus.Error: Debug.LogError($"LED {name}: {message}"); break;
+            case LEDStatus.Warning: Debug.LogWarning($"LED {name}: {message}"); break;
+            default: Debug.Log($"LED {name}: {message}"); break;
         }
 
         if (statusMessages.Count > 5)
-        {
             statusMessages.RemoveAt(0);
-        }
 
         if (status != LEDStatus.Error && status != LEDStatus.Warning)
-        {
             StartCoroutine(ClearStatusAfterDelay(5f));
-        }
     }
 
     IEnumerator ClearStatusAfterDelay(float delay)
@@ -336,7 +328,8 @@ public class VirtualLED : CircuitComponent, IConnectable
 
         if (ledRenderer != null)
         {
-            Material burnedMat = new Material(Shader.Find("Standard"));
+            Shader s = Shader.Find("Standard") ?? Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Sprites/Default");
+            Material burnedMat = new Material(s);
             burnedMat.color = new Color(0.3f, 0.3f, 0.3f);
             ledRenderer.material = burnedMat;
         }
@@ -380,63 +373,77 @@ public class VirtualLED : CircuitComponent, IConnectable
         }
     }
 
-    // Реализация IConnectable
-    public string GetName()
-    {
-        return name;
-    }
-
-    public void OnConnected(int pin, IConnectable otherComponent, int otherPin)
+    // ===== IConnectable hooks =====
+    public override void OnConnected(int pin, IConnectable otherComponent, int otherPin)
     {
         Debug.Log($"LED {name} pin {pin} connected to {otherComponent.GetName()} pin {otherPin}");
 
-        if (pin == 1) // положительный пин
+        if (pin == 1)
         {
-            positivePin = otherPin;
+            anodeConnectedTo = otherComponent;
+            anodeConnectedPin = otherPin;
+
+            // если подключились к Arduino, сохраним ссылку
             if (otherComponent is VirtualArduino arduino)
                 connectedArduino = arduino;
         }
-        else if (pin == 2) // отрицательный пин
+        else if (pin == 2)
         {
-            negativePin = otherPin;
+            cathodeConnectedTo = otherComponent;
+            cathodeConnectedPin = otherPin;
         }
+
+        // Обновим “старые” поля ради совместимости с остальным кодом
+        positivePin = (anodeConnectedTo != null) ? 1 : -1;
+        negativePin = (cathodeConnectedTo != null) ? 2 : -1;
+
+        AnalyzeConnection();
+        UpdateStatusIndicator();
     }
 
-    public void OnDisconnected(int pin)
+    public override void OnDisconnected(int pin)
     {
         Debug.Log($"LED {name} pin {pin} disconnected");
 
         if (pin == 1)
         {
-            positivePin = -1;
+            anodeConnectedTo = null;
+            anodeConnectedPin = -1;
             connectedArduino = null;
         }
         else if (pin == 2)
         {
-            negativePin = -1;
+            cathodeConnectedTo = null;
+            cathodeConnectedPin = -1;
         }
+
+        positivePin = (anodeConnectedTo != null) ? 1 : -1;
+        negativePin = (cathodeConnectedTo != null) ? 2 : -1;
+
+        AnalyzeConnection();
+        UpdateStatusIndicator();
     }
 
-    public Vector3 GetPinPosition(int pin)
+    public override Vector3 GetPinPosition(int pin)
     {
-        PinHighlighter[] pins = GetComponentsInChildren<PinHighlighter>();
-        foreach (PinHighlighter pinObj in pins)
+        // Держимся только UltraSimplePin, чтобы не было конфликтов систем
+        UltraSimplePin[] ultraPins = GetComponentsInChildren<UltraSimplePin>(true);
+        foreach (var pinObj in ultraPins)
         {
-            if (pinObj.pinNumber == pin)
-            {
+            if (pinObj != null && pinObj.pinNumber == pin)
                 return pinObj.transform.position;
-            }
         }
 
+        // fallback
         return transform.position + new Vector3((pin == 1 ? -0.1f : 0.1f), 0, 0);
     }
 
-    public bool CanConnectTo(int pin, IConnectable otherComponent, int otherPin)
+    public override bool CanConnectTo(int pin, IConnectable otherComponent, int otherPin)
     {
         return true;
     }
 
-    // Новый метод для тестов
+    // ===== Доп методы =====
     public void UpdateWithCurrentFlow(float positiveVoltage, float negativeVoltage)
     {
         float voltageDifference = positiveVoltage - negativeVoltage;
@@ -448,48 +455,6 @@ public class VirtualLED : CircuitComponent, IConnectable
         return emissionMaterial != null;
     }
 
-    public void ConnectToPins(int posPin, int negPin)
-    {
-        positivePin = posPin;
-        negativePin = negPin;
-    }
-
-    [ContextMenu("Тест: Правильное подключение")]
-    public void TestCorrectConnection()
-    {
-        Debug.Log("=== Тест правильного подключения LED ===");
-        connectedArduino = FindObjectOfType<VirtualArduino>();
-        positivePin = 13;
-        negativePin = 100;
-        resistance = 220f;
-
-        OnVoltageChanged(5f);
-    }
-
-    [ContextMenu("Тест: Без резистора")]
-    public void TestNoResistor()
-    {
-        Debug.Log("=== Тест подключения без резистора ===");
-        connectedArduino = FindObjectOfType<VirtualArduino>();
-        positivePin = 13;
-        negativePin = 100;
-        resistance = 10f;
-
-        OnVoltageChanged(5f);
-    }
-
-    [ContextMenu("Тест: Обратная полярность")]
-    public void TestReversePolarity()
-    {
-        Debug.Log("=== Тест обратной полярности ===");
-        connectedArduino = FindObjectOfType<VirtualArduino>();
-        positivePin = 100;
-        negativePin = 13;
-        resistance = 220f;
-
-        OnVoltageChanged(5f);
-    }
-
     [ContextMenu("Сбросить LED")]
     public void ResetLED()
     {
@@ -498,10 +463,19 @@ public class VirtualLED : CircuitComponent, IConnectable
         ClearStatusMessages();
         currentStatus = LEDStatus.NotConnected;
 
+        anodeConnectedTo = null;
+        anodeConnectedPin = -1;
+        cathodeConnectedTo = null;
+        cathodeConnectedPin = -1;
+
+        positivePin = -1;
+        negativePin = -1;
+
         if (ledRenderer != null && emissionMaterial != null)
         {
             ledRenderer.material = emissionMaterial;
-            emissionMaterial.SetColor("_EmissionColor", Color.black);
+            if (emissionMaterial.HasProperty("_EmissionColor"))
+                emissionMaterial.SetColor("_EmissionColor", Color.black);
         }
 
         if (ledLight != null) ledLight.enabled = false;

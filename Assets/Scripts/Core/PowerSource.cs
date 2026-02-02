@@ -32,9 +32,8 @@ public class PowerSource : MonoBehaviour
         {
             if (component.isActive)
             {
-                // Для каждого компонента рассчитываем ток
-                float componentCurrent = component.CalculateCurrent(voltage,
-                    ground != null ? ground.voltage : 0f);
+                // Для каждого компонента рассчитываем ток по закону Ома
+                float componentCurrent = CalculateCurrentForComponent(component);
 
                 totalCurrentDraw += componentCurrent;
 
@@ -51,17 +50,51 @@ public class PowerSource : MonoBehaviour
         Debug.Log($"Total current draw: {totalCurrentDraw:F3}A");
     }
 
+    float CalculateCurrentForComponent(CircuitComponent component)
+    {
+        if (component.resistance <= 0)
+        {
+            Debug.LogWarning($"Component {component.name} has invalid resistance: {component.resistance}");
+            return 0f;
+        }
+
+        // Расчет тока по закону Ома: I = V / R
+        float effectiveVoltage = voltage;
+        if (ground != null)
+        {
+            effectiveVoltage = voltage - ground.voltage;
+        }
+
+        float current = effectiveVoltage / component.resistance;
+
+        // Ограничение по максимальному току компонента
+        if (current > component.maxCurrent)
+        {
+            current = component.maxCurrent;
+            Debug.LogWarning($"Component {component.name} limited to max current: {component.maxCurrent}A");
+        }
+
+        // Сохраняем расчетные значения в компоненте
+        component.currentCurrent = current;
+        component.voltageDrop = effectiveVoltage;
+
+        return current;
+    }
+
     void UpdateConnectedComponents()
     {
         foreach (var component in connectedComponents)
         {
-            if (component is VirtualLED led)
+            if (component.isActive)
             {
-                led.UpdateWithCurrentFlow(voltage, ground != null ? ground.voltage : 0f);
-            }
-            else
-            {
+                // Обновляем напряжение на компоненте
                 component.OnVoltageChanged(voltage);
+
+                // Для LED специальная обработка
+                if (component is VirtualLED led)
+                {
+                    led.UpdateWithCurrentFlow(voltage, ground != null ? ground.voltage : 0f);
+                }
             }
         }
     }

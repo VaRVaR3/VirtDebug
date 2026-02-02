@@ -1,6 +1,6 @@
+п»їusing UnityEngine;
 using System.Collections.Generic;
 using System.Text;
-using UnityEngine;
 using TMPro;
 
 public class ArduinoSimulator : MonoBehaviour
@@ -103,14 +103,28 @@ public class ArduinoSimulator : MonoBehaviour
 
     public void ClearWorkspace()
     {
-        // 1. Очищаем все провода через ConnectionManager
-        if (ConnectionManager.Instance != null)
+        Debug.Log("=== CLEARING WORKSPACE ===");
+
+        // 1. РћС‡РёС‰Р°РµРј РІСЃРµ СЃРѕРµРґРёРЅРµРЅРёСЏ
+        if (SuperSimpleConnectionManager.Instance != null)
         {
-            ConnectionManager.Instance.DisconnectAll();
-            ConnectionManager.Instance.ClearAllWires();
+            SuperSimpleConnectionManager.Instance.DisconnectAll();
+            SuperSimpleConnectionManager.Instance.ClearAllWires();
+            Debug.Log("Cleared connection manager");
+        }
+        else
+        {
+            Debug.LogWarning("ConnectionManager not found, cleaning wires manually");
+            // Р СѓС‡РЅР°СЏ РѕС‡РёСЃС‚РєР° РїСЂРѕРІРѕРґРѕРІ
+            WireVisual[] allWires = FindObjectsOfType<WireVisual>();
+            foreach (var wire in allWires)
+            {
+                if (wire != null && wire.gameObject != null)
+                    Destroy(wire.gameObject);
+            }
         }
 
-        // 2. Удаляем все объекты в workspace
+        // 2. РЈРґР°Р»СЏРµРј РІСЃРµ РѕР±СЉРµРєС‚С‹ РІ workspace
         List<GameObject> objectsToDestroy = new List<GameObject>();
         foreach (Transform child in workspace)
         {
@@ -122,23 +136,11 @@ public class ArduinoSimulator : MonoBehaviour
             Destroy(obj);
         }
 
-        // 3. Удаляем все провода, которые могут быть вне workspace
-        GameObject[] allWires = GameObject.FindObjectsOfType<GameObject>();
-        foreach (GameObject obj in allWires)
-        {
-            if (obj.name.Contains("Wire") || obj.name.Contains("TempWire"))
-            {
-                Destroy(obj);
-            }
-        }
-
-        // 4. Сбрасываем состояние
+        // 3. РЎР±СЂР°СЃС‹РІР°РµРј СЃРѕСЃС‚РѕСЏРЅРёРµ
         currentArduino = null;
         components.Clear();
         SerialPrint("Workspace cleared");
 
-        // 5. Принудительный сбор мусора
-        System.GC.Collect();
-        Resources.UnloadUnusedAssets();
+        Debug.Log("вњ… Workspace cleared successfully");
     }
 }

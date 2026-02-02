@@ -11,7 +11,7 @@ public class CurrentVisualizer : MonoBehaviour
     public float arrowSize = 0.2f;
 
     [Header("References")]
-    public ConnectionManager connectionManager;
+    public SuperSimpleConnectionManager supersimpleconnectionManager;
 
     private Dictionary<string, LineRenderer> currentLines = new Dictionary<string, LineRenderer>();
     private Transform visualizationParent;
@@ -21,13 +21,13 @@ public class CurrentVisualizer : MonoBehaviour
         // Создаем родительский объект для визуализации
         visualizationParent = new GameObject("CurrentVisualization").transform;
 
-        if (connectionManager == null)
-            connectionManager = FindObjectOfType<ConnectionManager>();
+        if (supersimpleconnectionManager == null)
+            supersimpleconnectionManager = FindObjectOfType<SuperSimpleConnectionManager>();
     }
 
     void Update()
     {
-        if (connectionManager == null) return;
+        if (supersimpleconnectionManager == null) return;
 
         ClearVisualization();
         VisualizeAllConnections();
@@ -46,7 +46,7 @@ public class CurrentVisualizer : MonoBehaviour
 
     void VisualizeAllConnections()
     {
-        var connections = connectionManager.GetConnections();
+        var connections = supersimpleconnectionManager.GetConnections();
 
         foreach (var connection in connections)
         {
@@ -57,7 +57,7 @@ public class CurrentVisualizer : MonoBehaviour
         }
     }
 
-    void VisualizeConnection(ConnectionManager.WireConnection connection)
+    void VisualizeConnection(SuperSimpleConnectionManager.WireConnection connection)
     {
         Vector3 startPos = connection.sourceComponent.GetPinPosition(connection.sourcePin);
         Vector3 endPos = connection.targetComponent.GetPinPosition(connection.targetPin);

@@ -14,7 +14,7 @@ public class SimpleComponentDragger : MonoBehaviour
     void OnMouseDown()
     {
         // Проверяем не подключение ли это
-        if (ConnectionManager.Instance != null && ConnectionManager.Instance.isConnecting)
+        if (SuperSimpleConnectionManager.Instance != null && SuperSimpleConnectionManager.Instance.isConnecting)
         {
             Debug.Log("Пропускаем перетаскивание - идет подключение");
             return;

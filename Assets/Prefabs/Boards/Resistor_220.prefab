@@ -119,7 +119,7 @@ GameObject:
   - component: {fileID: 4950461342067627652}
   - component: {fileID: 8393657834378804996}
   - component: {fileID: 7542379427150023431}
-  - component: {fileID: 4824266927870655500}
+  - component: {fileID: 5375126527119023602}
   m_Layer: 3
   m_Name: Cylinder
   m_TagString: Untagged
@@ -214,8 +214,8 @@ CapsuleCollider:
   m_Radius: 0.5000001
   m_Height: 2
   m_Direction: 1
-  m_Center: {x: 0.000000059604645, y: 0, z: -0.00000008940697}
---- !u!114 &4824266927870655500
+  m_Center: {x: 0, y: 0, z: 0}
+--- !u!114 &5375126527119023602
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -224,16 +224,15 @@ MonoBehaviour:
   m_GameObject: {fileID: 2296656223145588003}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b2cea6f093f52b640874cef4d42bc661, type: 3}
+  m_Script: {fileID: 11500000, guid: c73e289f61738af4e9551d35fd752d01, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  normalMaterial: {fileID: 2100000, guid: d0f2471c0d803094e81705d9e925cd1a, type: 2}
-  highlightMaterial: {fileID: 2100000, guid: 8831934f4227f2447ba2db88ef746033, type: 2}
-  connectedMaterial: {fileID: 2100000, guid: 8bb9c65e205fc094aa72edf4401c7018, type: 2}
   pinNumber: 1
-  pinMode: 0
-  isConnected: 0
-  parentMonoBehaviour: {fileID: 0}
+  pinMode: 1
+  isGroundPin: 0
+  isPowerPin: 0
+  normalColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  connectedColor: {r: 0, g: 1, b: 0, a: 1}
 --- !u!1 &2453714399710575077
 GameObject:
   m_ObjectHideFlags: 0
@@ -246,7 +245,7 @@ GameObject:
   - component: {fileID: 2464833400828936217}
   - component: {fileID: 9018271450954533301}
   - component: {fileID: 1605085320506183617}
-  - component: {fileID: 1461860317621456119}
+  - component: {fileID: 6552275703692751452}
   m_Layer: 3
   m_Name: Cylinder (1)
   m_TagString: Untagged
@@ -341,8 +340,8 @@ CapsuleCollider:
   m_Radius: 0.5000001
   m_Height: 2
   m_Direction: 1
-  m_Center: {x: 0.000000059604645, y: 0, z: -0.00000008940697}
---- !u!114 &1461860317621456119
+  m_Center: {x: 0, y: 0, z: 0}
+--- !u!114 &6552275703692751452
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -351,16 +350,15 @@ MonoBehaviour:
   m_GameObject: {fileID: 2453714399710575077}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b2cea6f093f52b640874cef4d42bc661, type: 3}
+  m_Script: {fileID: 11500000, guid: c73e289f61738af4e9551d35fd752d01, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  normalMaterial: {fileID: 2100000, guid: d0f2471c0d803094e81705d9e925cd1a, type: 2}
-  highlightMaterial: {fileID: 2100000, guid: 8831934f4227f2447ba2db88ef746033, type: 2}
-  connectedMaterial: {fileID: 2100000, guid: 8bb9c65e205fc094aa72edf4401c7018, type: 2}
   pinNumber: 2
-  pinMode: 0
-  isConnected: 0
-  parentMonoBehaviour: {fileID: 0}
+  pinMode: 1
+  isGroundPin: 0
+  isPowerPin: 0
+  normalColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  connectedColor: {r: 0, g: 1, b: 0, a: 1}
 --- !u!1 &3174499902118347184
 GameObject:
   m_ObjectHideFlags: 0
@@ -481,7 +479,7 @@ GameObject:
   - component: {fileID: 4889044934821794886}
   - component: {fileID: 8793832915987224739}
   - component: {fileID: 3666650383968323313}
-  - component: {fileID: -6646305703461751399}
+  - component: {fileID: 895387191894968950}
   m_Layer: 6
   m_Name: Resistor_220
   m_TagString: Untagged
@@ -581,7 +579,7 @@ CapsuleCollider:
   m_Radius: 0.5000001
   m_Height: 2
   m_Direction: 1
-  m_Center: {x: 0.000000059604645, y: 0, z: -0.00000008940697}
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!114 &3666650383968323313
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -594,15 +592,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 87602265fc127ae46aa294cf7a7de3be, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  isActive: 1
   resistance: 220
   maxVoltage: 50
   maxCurrent: 1
   requiresPolarity: 0
-  isActive: 1
+  canBurnOut: 0
   positivePin: -1
   negativePin: -1
   connectedArduino: {fileID: 0}
   currentVoltage: 0
+  currentDraw: 0
+  currentCurrent: 0
+  voltageDrop: 0
   standardValues:
   - 100
   - 220
@@ -618,7 +620,7 @@ MonoBehaviour:
   - {r: 0, g: 0, b: 0, a: 0}
   - {r: 0, g: 0, b: 0, a: 0}
   - {r: 0, g: 0, b: 0, a: 0}
---- !u!114 &-6646305703461751399
+--- !u!114 &895387191894968950
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -627,14 +629,10 @@ MonoBehaviour:
   m_GameObject: {fileID: 6051267514023298637}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d24487f7a7d9423479091af9f4009e88, type: 3}
+  m_Script: {fileID: 11500000, guid: 439d4c381b058fe43a6052a935852dda, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  dragSpeed: 10
-  rotationSpeed: 100
-  useGrid: 1
-  gridSize: 0.25
-  liftHeight: 0.1
+  canDrag: 1
 --- !u!1 &7999712877010607394
 GameObject:
   m_ObjectHideFlags: 0

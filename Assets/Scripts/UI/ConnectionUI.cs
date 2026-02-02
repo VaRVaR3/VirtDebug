@@ -9,9 +9,9 @@ public class ConnectionUI : MonoBehaviour
 
     void Update()
     {
-        if (ConnectionManager.Instance != null)
+        if (SuperSimpleConnectionManager.Instance != null)
         {
-            if (ConnectionManager.Instance.isConnecting)
+            if (SuperSimpleConnectionManager.Instance.isConnecting)
             {
                 statusText.text = "CONNECTING... Click on target pin";
                 statusIndicator.color = Color.yellow;

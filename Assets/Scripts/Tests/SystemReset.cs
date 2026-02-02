@@ -33,9 +33,9 @@ public class SystemReset : MonoBehaviour
         Debug.Log($"Удалено проводов: {wires.Length}");
 
         // Сбрасываем ConnectionManager
-        if (ConnectionManager.Instance != null)
+        if (SuperSimpleConnectionManager.Instance != null)
         {
-            ConnectionManager.Instance.DisconnectAll();
+            SuperSimpleConnectionManager.Instance.DisconnectAll();
             Debug.Log("ConnectionManager сброшен");
         }
 
@@ -179,10 +179,10 @@ public class SystemReset : MonoBehaviour
         Debug.Log("✅ Создан TestPin с PinHighlighter");
 
         // Создаем ConnectionManager если нет
-        if (ConnectionManager.Instance == null)
+        if (SuperSimpleConnectionManager.Instance == null)
         {
             GameObject cmObj = new GameObject("ConnectionManager");
-            cmObj.AddComponent<ConnectionManager>();
+            cmObj.AddComponent<SuperSimpleConnectionManager>();
             Debug.Log("✅ Создан ConnectionManager");
         }
 

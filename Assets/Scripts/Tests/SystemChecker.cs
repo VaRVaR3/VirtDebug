@@ -25,11 +25,11 @@ public class SystemChecker : MonoBehaviour
         Debug.Log("=== SYSTEM CHECK ===");
 
         // Проверка ConnectionManager
-        if (ConnectionManager.Instance == null)
+        if (SuperSimpleConnectionManager.Instance == null)
         {
             Debug.LogError("❌ ConnectionManager.Instance is NULL");
             // Пытаемся найти
-            ConnectionManager cm = FindObjectOfType<ConnectionManager>();
+            SuperSimpleConnectionManager cm = FindObjectOfType<SuperSimpleConnectionManager>();
             if (cm != null)
                 Debug.Log("⚠️ ConnectionManager exists but Instance not set");
         }
@@ -100,11 +100,11 @@ public class SystemChecker : MonoBehaviour
         Debug.Log($"LED pin parent: {ledPin.parentComponent != null}");
 
         // Пытаемся соединить
-        if (ConnectionManager.Instance != null)
+        if (SuperSimpleConnectionManager.Instance != null)
         {
             Debug.Log("Attempting connection...");
-            ConnectionManager.Instance.StartConnection(arduinoPin.parentComponent, arduinoPin.pinNumber);
-            ConnectionManager.Instance.CompleteConnection(ledPin.parentComponent, ledPin.pinNumber);
+            SuperSimpleConnectionManager.Instance.StartConnection(arduinoPin.parentComponent, arduinoPin.pinNumber);
+            SuperSimpleConnectionManager.Instance.CompleteConnection(ledPin.parentComponent, ledPin.pinNumber);
         }
     }
 
@@ -138,10 +138,10 @@ public class SystemChecker : MonoBehaviour
         GUI.Label(new Rect(10, y, 400, 30), "F2 - Test Pin Connection", style); y += 30;
         GUI.Label(new Rect(10, y, 400, 30), "F3 - Test Dragging", style); y += 30;
 
-        if (ConnectionManager.Instance != null)
+        if (SuperSimpleConnectionManager.Instance != null)
         {
-            string status = ConnectionManager.Instance.isConnecting ?
-                $"CONNECTING (pin {ConnectionManager.Instance.GetConnectingPin()})" : "IDLE";
+            string status = SuperSimpleConnectionManager.Instance.isConnecting ?
+                $"CONNECTING (pin {SuperSimpleConnectionManager.Instance.GetConnectingPin()})" : "IDLE";
             GUI.Label(new Rect(10, y, 400, 30), $"ConnectionManager: {status}", style);
         }
     }

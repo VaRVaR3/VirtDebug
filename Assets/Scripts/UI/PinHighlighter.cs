@@ -1,4 +1,4 @@
-using UnityEngine;
+п»їusing UnityEngine;
 using UnityEngine.EventSystems;
 using System.Collections;
 
@@ -17,6 +17,10 @@ public class PinHighlighter : MonoBehaviour
     public bool isGroundPin = false;
     public bool isPowerPin = false;
 
+    [Header("Interaction Settings")]
+    public float colliderSize = 0.3f; // РЈР’Р•Р›РР§РР›Р
+    public float interactionDistance = 5f;
+
     [Header("Tooltip")]
     public string pinDescription = "";
     public GameObject tooltipObject;
@@ -31,28 +35,73 @@ public class PinHighlighter : MonoBehaviour
     private Camera mainCamera;
     private EventSystem eventSystem;
     private TextMesh tooltipText;
-    private float tooltipTimer = 0f;
+    private Coroutine tooltipCoroutine;
+    private Collider pinCollider;
 
     void Start()
     {
+        Debug.LogError("PINHIGHLIGHTER FOUND ON: " + GetFullPath(transform));
+
         mainCamera = Camera.main;
         eventSystem = EventSystem.current;
 
+        // РќР°С…РѕРґРёРј РёР»Рё СЃРѕР·РґР°РµРј СЂРµРЅРґРµСЂРµСЂ
         pinRenderer = GetComponent<Renderer>();
         if (pinRenderer == null)
+        {
+            // РС‰РµРј РІ РґРѕС‡РµСЂРЅРёС… РѕР±СЉРµРєС‚Р°С…
             pinRenderer = GetComponentInChildren<Renderer>();
+            if (pinRenderer == null)
+            {
+                // РЎРѕР·РґР°РµРј РІРёР·СѓР°Р» РґР»СЏ РїРёРЅР° РµСЃР»Рё РµРіРѕ РЅРµС‚
+                CreatePinVisual();
+            }
+        }
 
-        if (pinRenderer != null && normalMaterial != null)
+        if (pinRenderer != null)
+        {
+            if (normalMaterial == null)
+            {
+                normalMaterial = new Material(Shader.Find("Standard"));
+            }
             pinRenderer.material = normalMaterial;
+        }
 
-        // Инициализируем подсказку
         InitializeTooltip();
-
         FindParentComponent();
-        SetupCollider();
+        SetupCollider(); // РўРµРїРµСЂСЊ СЃ СѓРІРµР»РёС‡РµРЅРЅС‹Рј РєРѕР»Р»Р°Р№РґРµСЂРѕРј
         UpdatePinVisual();
 
-        Debug.Log($"Pin {pinNumber} ({pinMode}) initialized");
+        Debug.Log($"вњ… Pin {pinNumber} ({pinMode}) initialized");
+    }
+
+    private string GetFullPath(Transform t)
+    {
+        string path = t.name;
+        while (t.parent != null)
+        {
+            t = t.parent;
+            path = t.name + "/" + path;
+        }
+        return path;
+    }
+
+    void CreatePinVisual()
+    {
+        GameObject visual = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        visual.name = "PinVisual";
+        visual.transform.SetParent(transform);
+        visual.transform.localPosition = Vector3.zero;
+        visual.transform.localScale = Vector3.one * 0.15f;
+
+        Destroy(visual.GetComponent<Collider>()); // РЈРґР°Р»СЏРµРј СЃС‚Р°РЅРґР°СЂС‚РЅС‹Р№ РєРѕР»Р»Р°Р№РґРµСЂ
+
+        pinRenderer = visual.GetComponent<Renderer>();
+        if (normalMaterial == null)
+        {
+            normalMaterial = new Material(Shader.Find("Standard"));
+        }
+        pinRenderer.material = normalMaterial;
     }
 
     void InitializeTooltip()
@@ -61,7 +110,7 @@ public class PinHighlighter : MonoBehaviour
         {
             tooltipObject = new GameObject("PinTooltip");
             tooltipObject.transform.SetParent(transform);
-            tooltipObject.transform.localPosition = new Vector3(0, 0.3f, 0);
+            tooltipObject.transform.localPosition = new Vector3(0, 0.4f, 0); // РџРѕРґРЅСЏР»Рё РІС‹С€Рµ
 
             GameObject textObj = new GameObject("TooltipText");
             textObj.transform.SetParent(tooltipObject.transform);
@@ -69,9 +118,10 @@ public class PinHighlighter : MonoBehaviour
 
             tooltipText = textObj.AddComponent<TextMesh>();
             tooltipText.characterSize = 0.05f;
-            tooltipText.fontSize = 20;
+            tooltipText.fontSize = 24; // РЈРІРµР»РёС‡РёР»Рё
             tooltipText.alignment = TextAlignment.Center;
             tooltipText.anchor = TextAnchor.MiddleCenter;
+            tooltipText.color = Color.white;
         }
         else
         {
@@ -86,16 +136,16 @@ public class PinHighlighter : MonoBehaviour
     {
         if (tooltipText == null) return;
 
-        string tooltip = $"Пин {pinNumber}\n";
-        tooltip += $"Режим: {pinMode}\n";
+        string tooltip = $"Pin {pinNumber}\n";
+        tooltip += $"{pinMode}\n";
 
         if (!string.IsNullOrEmpty(pinDescription))
             tooltip += $"{pinDescription}\n";
 
         if (isGroundPin)
-            tooltip += "Земля (GND)\n";
+            tooltip += "GND\n";
         else if (isPowerPin)
-            tooltip += "Питание (+5V)\n";
+            tooltip += "+5V\n";
 
         tooltipText.text = tooltip;
     }
@@ -106,18 +156,12 @@ public class PinHighlighter : MonoBehaviour
 
         if (isGroundPin)
         {
-            // Чёрный для GND
-            Material groundMat = new Material(Shader.Find("Standard"));
-            groundMat.color = Color.black;
-            pinRenderer.material = groundMat;
+            pinRenderer.material.color = Color.black;
             return;
         }
         else if (isPowerPin)
         {
-            // Красный для питания
-            Material powerMat = new Material(Shader.Find("Standard"));
-            powerMat.color = Color.red;
-            pinRenderer.material = powerMat;
+            pinRenderer.material.color = Color.red;
             return;
         }
 
@@ -143,17 +187,27 @@ public class PinHighlighter : MonoBehaviour
 
     void SetupCollider()
     {
-        // Удаляем старый коллайдер если есть
-        Collider oldCollider = GetComponent<Collider>();
-        if (oldCollider != null)
-            Destroy(oldCollider);
+        // РЈРґР°Р»СЏРµРј СЃС‚Р°СЂС‹Рµ РєРѕР»Р»Р°Р№РґРµСЂС‹
+        Collider[] oldColliders = GetComponents<Collider>();
+        foreach (var col in oldColliders)
+            Destroy(col);
 
-        // Добавляем новый коллайдер
-        BoxCollider collider = gameObject.AddComponent<BoxCollider>();
-        collider.size = new Vector3(0.2f, 0.2f, 0.2f);
-        collider.isTrigger = true;
+        // РЈРґР°Р»СЏРµРј РєРѕР»Р»Р°Р№РґРµСЂС‹ РІ РґРѕС‡РµСЂРЅРёС… РѕР±СЉРµРєС‚Р°С… (РєСЂРѕРјРµ РІРёР·СѓР°Р»Р°)
+        Collider[] childColliders = GetComponentsInChildren<Collider>();
+        foreach (var col in childColliders)
+        {
+            if (col.gameObject != gameObject && col.GetComponent<Renderer>() == null)
+                Destroy(col);
+        }
 
-        Debug.Log($"Added collider to pin {pinNumber}");
+        // Р”РѕР±Р°РІР»СЏРµРј SphereCollider (Р»СѓС‡С€Рµ РґР»СЏ РІР·Р°РёРјРѕРґРµР№СЃС‚РІРёСЏ)
+        SphereCollider sphereCollider = gameObject.AddComponent<SphereCollider>();
+        sphereCollider.radius = colliderSize / 2f;
+        sphereCollider.isTrigger = true;
+
+        pinCollider = sphereCollider;
+
+        Debug.Log($"вњ… Pin {pinNumber}: Sphere collider added (radius: {sphereCollider.radius})");
     }
 
     void FindParentComponent()
@@ -174,25 +228,37 @@ public class PinHighlighter : MonoBehaviour
                 {
                     parentComponent = connectable;
                     parentMonoBehaviour = component;
-                    Debug.Log($"Found parent IConnectable for pin {pinNumber}: {component.GetType().Name}");
+                    Debug.Log($"вњ… Found parent IConnectable for pin {pinNumber}: {component.GetType().Name}");
                     return;
                 }
             }
             current = current.parent;
         }
 
-        Debug.LogWarning($"Pin {pinNumber}: Parent IConnectable component not found");
-    }
+        Debug.LogWarning($"вљ пёЏ Pin {pinNumber}: Parent IConnectable not found. Trying to find in scene...");
 
-    void Update()
-    {
-        // Управление подсказкой
-        if (isHighlighted)
+        // РџРѕРїСЂРѕР±СѓРµРј РЅР°Р№С‚Рё РєРѕРјРїРѕРЅРµРЅС‚ РїРѕ РёРјРµРЅРё
+        string parentName = transform.parent?.name ?? "Unknown";
+        if (parentName.Contains("LED") || parentName.Contains("Led"))
         {
-            tooltipTimer += Time.deltaTime;
-            if (tooltipTimer > 0.5f && !tooltipObject.activeSelf)
+            VirtualLED led = GetComponentInParent<VirtualLED>();
+            if (led != null)
             {
-                tooltipObject.SetActive(true);
+                parentComponent = led;
+                parentMonoBehaviour = led;
+                Debug.Log($"вњ… Auto-assigned LED as parent for pin {pinNumber}");
+                return;
+            }
+        }
+        else if (parentName.Contains("Arduino") || parentName.Contains("Board"))
+        {
+            VirtualArduino arduino = GetComponentInParent<VirtualArduino>();
+            if (arduino != null)
+            {
+                parentComponent = arduino;
+                parentMonoBehaviour = arduino;
+                Debug.Log($"вњ… Auto-assigned Arduino as parent for pin {pinNumber}");
+                return;
             }
         }
     }
@@ -204,11 +270,17 @@ public class PinHighlighter : MonoBehaviour
 
         if (!IsInteractable()) return;
 
+        // РџСЂРѕРІРµСЂСЏРµРј СЂР°СЃСЃС‚РѕСЏРЅРёРµ РґРѕ РєР°РјРµСЂС‹
+        float distance = Vector3.Distance(transform.position, mainCamera.transform.position);
+        if (distance > interactionDistance)
+        {
+            Debug.Log($"Pin {pinNumber} too far: {distance:F1}m");
+            return;
+        }
+
         isHighlighted = true;
         HighlightPin();
-
-        // Показываем подсказку с задержкой
-        tooltipTimer = 0f;
+        ShowTooltipWithDelay();
     }
 
     void OnMouseExit()
@@ -217,19 +289,47 @@ public class PinHighlighter : MonoBehaviour
 
         isHighlighted = false;
         UnhighlightPin();
+        HideTooltip();
+    }
 
-        tooltipObject.SetActive(false);
+    void ShowTooltipWithDelay()
+    {
+        if (tooltipCoroutine != null)
+            StopCoroutine(tooltipCoroutine);
+
+        tooltipCoroutine = StartCoroutine(ShowTooltipAfterDelay(0.3f)); // РЈРјРµРЅСЊС€РёР»Рё Р·Р°РґРµСЂР¶РєСѓ
+    }
+
+    IEnumerator ShowTooltipAfterDelay(float delay)
+    {
+        yield return new WaitForSeconds(delay);
+
+        if (isHighlighted && tooltipObject != null)
+        {
+            tooltipObject.SetActive(true);
+        }
+    }
+
+    void HideTooltip()
+    {
+        if (tooltipCoroutine != null)
+            StopCoroutine(tooltipCoroutine);
+
+        if (tooltipObject != null)
+            tooltipObject.SetActive(false);
     }
 
     void HighlightPin()
     {
-        if (pinRenderer == null || highlightMaterial == null) return;
+        if (pinRenderer == null) return;
 
-        // Сохраняем оригинальный материал
-        if (!isConnected)
+        if (highlightMaterial == null)
         {
-            pinRenderer.material = highlightMaterial;
+            highlightMaterial = new Material(Shader.Find("Standard"));
+            highlightMaterial.color = Color.white;
         }
+
+        pinRenderer.material = highlightMaterial;
     }
 
     void UnhighlightPin()
@@ -244,115 +344,100 @@ public class PinHighlighter : MonoBehaviour
 
     void OnMouseDown()
     {
+        Debug.Log($"=== PIN {pinNumber} MOUSE DOWN ===");
+
         if (eventSystem != null && eventSystem.IsPointerOverGameObject())
+        {
+            Debug.Log("Over UI, ignoring");
             return;
+        }
 
-        if (!IsInteractable()) return;
-
-        Debug.Log($"=== CLICKED ON PIN {pinNumber} ===");
+        if (!IsInteractable())
+        {
+            Debug.Log("Not interactable");
+            return;
+        }
 
         if (parentComponent == null)
         {
-            ShowPinError("Пин не подключен к компоненту!");
-            FindParentComponent(); // Пытаемся найти снова
+            Debug.LogError($"Pin {pinNumber}: No parent component!");
+            FindParentComponent();
+
+            if (parentComponent == null)
+            {
+                ShowPinError("No parent component found!");
+                return;
+            }
+        }
+
+        if (SuperSimpleConnectionManager.Instance == null)
+        {
+            Debug.LogError("ConnectionManager not found!");
+            ShowPinError("Connection system not ready");
             return;
         }
 
-        if (ConnectionManager.Instance == null)
-        {
-            ShowPinError("ConnectionManager не найден!");
-            return;
-        }
+        Debug.Log($"рџ”„ Pin {pinNumber} clicked. Parent: {parentComponent.GetName()}");
 
-        // Проверяем, можно ли подключить этот пин
-        if (!CanConnectBasedOnMode())
+        // РџР РћРЎРўРђРЇ Р РЇРЎРќРђРЇ Р›РћР“РРљРђ
+        if (SuperSimpleConnectionManager.Instance.isConnecting)
         {
-            ShowPinError($"Пин в режиме {pinMode} не может быть подключён!");
-            return;
-        }
-
-        if (ConnectionManager.Instance.isConnecting)
-        {
-            Debug.Log($"Completing connection to pin {pinNumber}");
-            ConnectionManager.Instance.CompleteConnection(parentComponent, pinNumber);
+            Debug.Log($"рџ”„ Completing connection TO pin {pinNumber}");
+            SuperSimpleConnectionManager.Instance.CompleteConnection(parentComponent, pinNumber);
         }
         else
         {
-            Debug.Log($"Starting connection from pin {pinNumber}");
-            ConnectionManager.Instance.StartConnection(parentComponent, pinNumber);
-        }
-    }
-
-    bool CanConnectBasedOnMode()
-    {
-        // Определяем, можно ли подключать этот пин
-        switch (pinMode)
-        {
-            case PinMode.Input:
-            case PinMode.Output:
-            case PinMode.Ground:
-            case PinMode.Power:
-            case PinMode.Analog:
-            case PinMode.PWM:
-                return true;
-            default:
-                return true;
+            Debug.Log($"рџ”„ Starting connection FROM pin {pinNumber}");
+            SuperSimpleConnectionManager.Instance.StartConnection(parentComponent, pinNumber);
         }
     }
 
     void ShowPinError(string message)
     {
-        Debug.LogError($"Pin {pinNumber}: {message}");
+        Debug.LogError($"вќЊ Pin {pinNumber}: {message}");
 
-        // Визуальная обратная связь
-        if (pinRenderer != null && errorMaterial != null)
+        if (pinRenderer != null)
         {
             StartCoroutine(FlashError());
-        }
-
-        // Показываем в подсказке
-        if (tooltipText != null)
-        {
-            string originalText = tooltipText.text;
-            tooltipText.text = $"ОШИБКА!\n{message}";
-            tooltipObject.SetActive(true);
-
-            StartCoroutine(RestoreTooltip(originalText, 2f));
         }
     }
 
     IEnumerator FlashError()
     {
-        Material originalMat = pinRenderer.material;
+        if (pinRenderer == null) yield break;
+
+        Color originalColor = pinRenderer.material.color;
 
         for (int i = 0; i < 3; i++)
         {
-            pinRenderer.material = errorMaterial;
-            yield return new WaitForSeconds(0.1f);
-            pinRenderer.material = originalMat;
-            yield return new WaitForSeconds(0.1f);
-        }
-    }
-
-    IEnumerator RestoreTooltip(string originalText, float delay)
-    {
-        yield return new WaitForSeconds(delay);
-
-        if (tooltipText != null)
-        {
-            tooltipText.text = originalText;
+            pinRenderer.material.color = Color.red;
+            yield return new WaitForSeconds(0.15f);
+            pinRenderer.material.color = originalColor;
+            yield return new WaitForSeconds(0.15f);
         }
 
-        if (!isHighlighted)
-        {
-            tooltipObject.SetActive(false);
-        }
+        UpdatePinVisual();
     }
 
     private bool IsInteractable()
     {
-        if (pinRenderer == null) return false;
-        if (!gameObject.activeInHierarchy) return false;
+        if (pinRenderer == null)
+        {
+            Debug.Log($"Pin {pinNumber}: No renderer");
+            return false;
+        }
+
+        if (!gameObject.activeInHierarchy)
+        {
+            Debug.Log($"Pin {pinNumber}: Not active");
+            return false;
+        }
+
+        if (pinCollider == null || !pinCollider.enabled)
+        {
+            Debug.Log($"Pin {pinNumber}: No collider");
+            return false;
+        }
 
         return true;
     }
@@ -363,15 +448,21 @@ public class PinHighlighter : MonoBehaviour
 
         if (connected)
         {
-            if (connectedMaterial != null)
+            if (connectedMaterial == null)
+            {
+                connectedMaterial = new Material(Shader.Find("Standard"));
+                connectedMaterial.color = Color.cyan;
+            }
+
+            if (pinRenderer != null)
                 pinRenderer.material = connectedMaterial;
 
-            Debug.Log($"Pin {pinNumber} подключен");
+            Debug.Log($"вњ… Pin {pinNumber} connected");
         }
         else
         {
             UpdatePinVisual();
-            Debug.Log($"Pin {pinNumber} отключен");
+            Debug.Log($"вњ… Pin {pinNumber} disconnected");
         }
     }
 
@@ -382,21 +473,24 @@ public class PinHighlighter : MonoBehaviour
         UpdateTooltip();
     }
 
-    [ContextMenu("Тестировать пин")]
+    [ContextMenu("Test This Pin")]
     public void TestPin()
     {
-        Debug.Log($"=== Тест пина {pinNumber} ===");
-        Debug.Log($"Режим: {pinMode}");
+        Debug.Log($"=== Testing Pin {pinNumber} ===");
+        Debug.Log($"Mode: {pinMode}");
         Debug.Log($"GND: {isGroundPin}, Power: {isPowerPin}");
-        Debug.Log($"Подключён: {isConnected}");
-        Debug.Log($"Родитель: {parentComponent?.GetType().Name ?? "Нет"}");
+        Debug.Log($"Connected: {isConnected}");
+        Debug.Log($"Parent: {parentComponent?.GetType().Name ?? "None"}");
+        Debug.Log($"Has Collider: {GetComponent<Collider>() != null}");
 
-        // Мигание для теста
+        // РўРµСЃС‚РѕРІРѕРµ РјРёРіР°РЅРёРµ
         StartCoroutine(TestBlink());
     }
 
     IEnumerator TestBlink()
     {
+        if (pinRenderer == null) yield break;
+
         for (int i = 0; i < 3; i++)
         {
             pinRenderer.material.color = Color.white;
@@ -404,5 +498,12 @@ public class PinHighlighter : MonoBehaviour
             UpdatePinVisual();
             yield return new WaitForSeconds(0.2f);
         }
+    }
+
+    void OnDrawGizmosSelected()
+    {
+        // Р’РёР·СѓР°Р»РёР·Р°С†РёСЏ РєРѕР»Р»Р°Р№РґРµСЂР° РІ СЂРµРґР°РєС‚РѕСЂРµ
+        Gizmos.color = Color.green;
+        Gizmos.DrawWireSphere(transform.position, colliderSize / 2f);
     }
 }
