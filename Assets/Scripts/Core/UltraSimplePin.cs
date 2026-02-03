@@ -9,6 +9,9 @@ public class UltraSimplePin : MonoBehaviour
     public bool isGroundPin = false;
     public bool isPowerPin = false;
 
+    [Header("Collider")]
+    public float colliderRadius = 0.15f;
+
     [Header("Visual")]
     public Color normalColor = Color.gray;
     public Color connectedColor = Color.green;
@@ -18,9 +21,12 @@ public class UltraSimplePin : MonoBehaviour
     private bool isConnected = false;
     private IConnectable parentComponent;
 
-    void Start()
+    void Awake()
     {
+        EnsureCollider();
         pinRenderer = GetComponent<Renderer>();
+        if (pinRenderer == null) pinRenderer = GetComponentInChildren<Renderer>();
+
         if (pinRenderer != null)
         {
             pinMaterial = new Material(Shader.Find("Standard"));
@@ -31,17 +37,34 @@ public class UltraSimplePin : MonoBehaviour
         UpdateVisual();
     }
 
+    private void EnsureCollider()
+    {
+        Collider col = GetComponent<Collider>();
+        if (col == null) col = gameObject.AddComponent<SphereCollider>();
+
+        // Лучше SphereCollider
+        SphereCollider sc = col as SphereCollider;
+        if (sc == null)
+        {
+            Destroy(col);
+            sc = gameObject.AddComponent<SphereCollider>();
+        }
+
+        sc.radius = colliderRadius;
+        sc.isTrigger = true; // важно: клики будут через Raycast с QueryTriggerInteraction.Collide
+    }
+
     private void FindParentComponent()
     {
         Transform current = transform.parent;
         while (current != null)
         {
-            MonoBehaviour[] components = current.GetComponents<MonoBehaviour>();
-            foreach (var comp in components)
+            var monos = current.GetComponents<MonoBehaviour>();
+            foreach (var m in monos)
             {
-                if (comp is IConnectable connectable)
+                if (m is IConnectable c)
                 {
-                    parentComponent = connectable;
+                    parentComponent = c;
                     return;
                 }
             }
@@ -57,17 +80,24 @@ public class UltraSimplePin : MonoBehaviour
         else if (isPowerPin) pinMaterial.color = Color.red;
         else if (isConnected) pinMaterial.color = connectedColor;
         else pinMaterial.color = normalColor;
+
+        pinMaterial.EnableKeyword("_EMISSION");
+        pinMaterial.SetColor("_EmissionColor", pinMaterial.color * 0.25f);
+    }
+
+    public void SetConnected(bool connected)
+    {
+        isConnected = connected;
+        UpdateVisual();
     }
 
     // ✅ вызывается InteractionManager-ом
     public void HandleClickFromManager()
     {
-        if (parentComponent == null)
-            FindParentComponent();
-
+        if (parentComponent == null) FindParentComponent();
         if (parentComponent == null)
         {
-            Debug.LogError($"❌ Pin {pinNumber}: no parent IConnectable found.");
+            Debug.LogError($"❌ UltraSimplePin {pinNumber}: no parent IConnectable found.");
             return;
         }
 
@@ -78,18 +108,8 @@ public class UltraSimplePin : MonoBehaviour
         }
 
         if (SuperSimpleConnectionManager.Instance.isConnecting)
-        {
             SuperSimpleConnectionManager.Instance.CompleteConnection(parentComponent, pinNumber);
-        }
         else
-        {
             SuperSimpleConnectionManager.Instance.StartConnection(parentComponent, pinNumber);
-        }
-    }
-
-    public void SetConnected(bool connected)
-    {
-        isConnected = connected;
-        UpdateVisual();
     }
 }

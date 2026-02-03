@@ -293,6 +293,7 @@ MonoBehaviour:
   pinMode: 0
   isGroundPin: 0
   isPowerPin: 0
+  colliderRadius: 0.15
   normalColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   connectedColor: {r: 0, g: 1, b: 0, a: 1}
 --- !u!1 &2300821818531892171
@@ -431,8 +432,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e368b398cf71d7442905a39e0d8ab512, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  groundPins: []
-  autoCreateGroundPins: 1
+  groundPins:
+  - {fileID: 0}
+  - {fileID: 0}
+  autoCreateGroundPins: 0
   digitalPins: []
   analogPins: []
 --- !u!114 &4681659618220282004
@@ -570,6 +573,7 @@ MonoBehaviour:
   pinMode: 0
   isGroundPin: 0
   isPowerPin: 0
+  colliderRadius: 0.15
   normalColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   connectedColor: {r: 0, g: 1, b: 0, a: 1}
 --- !u!1 &2782622691908753994
@@ -865,6 +869,7 @@ MonoBehaviour:
   pinMode: 0
   isGroundPin: 0
   isPowerPin: 0
+  colliderRadius: 0.15
   normalColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   connectedColor: {r: 0, g: 1, b: 0, a: 1}
 --- !u!1 &4446735336664969670
@@ -989,6 +994,7 @@ MonoBehaviour:
   pinMode: 0
   isGroundPin: 0
   isPowerPin: 0
+  colliderRadius: 0.15
   normalColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   connectedColor: {r: 0, g: 1, b: 0, a: 1}
 --- !u!1 &4609862300250742851
@@ -1113,6 +1119,7 @@ MonoBehaviour:
   pinMode: 0
   isGroundPin: 0
   isPowerPin: 0
+  colliderRadius: 0.15
   normalColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   connectedColor: {r: 0, g: 1, b: 0, a: 1}
 --- !u!1 &5171808219196450536
@@ -1254,6 +1261,7 @@ MonoBehaviour:
   pinMode: 0
   isGroundPin: 1
   isPowerPin: 0
+  colliderRadius: 0.15
   normalColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   connectedColor: {r: 0, g: 1, b: 0, a: 1}
 --- !u!1 &6144175163297630516
@@ -1395,6 +1403,7 @@ MonoBehaviour:
   pinMode: 0
   isGroundPin: 1
   isPowerPin: 0
+  colliderRadius: 0.15
   normalColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   connectedColor: {r: 0, g: 1, b: 0, a: 1}
 --- !u!1 &6941828020673842004
@@ -1519,6 +1528,7 @@ MonoBehaviour:
   pinMode: 0
   isGroundPin: 0
   isPowerPin: 0
+  colliderRadius: 0.15
   normalColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   connectedColor: {r: 0, g: 1, b: 0, a: 1}
 --- !u!1 &6986639012138569540
@@ -1643,6 +1653,7 @@ MonoBehaviour:
   pinMode: 0
   isGroundPin: 0
   isPowerPin: 1
+  colliderRadius: 0.15
   normalColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   connectedColor: {r: 0, g: 1, b: 0, a: 1}
 --- !u!1 &7083342843493790692
@@ -1767,6 +1778,7 @@ MonoBehaviour:
   pinMode: 0
   isGroundPin: 0
   isPowerPin: 0
+  colliderRadius: 0.15
   normalColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   connectedColor: {r: 0, g: 1, b: 0, a: 1}
 --- !u!1 &7336386418110678960
@@ -1891,6 +1903,7 @@ MonoBehaviour:
   pinMode: 0
   isGroundPin: 0
   isPowerPin: 0
+  colliderRadius: 0.15
   normalColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   connectedColor: {r: 0, g: 1, b: 0, a: 1}
 --- !u!1 &7411141730775381402
@@ -2015,6 +2028,7 @@ MonoBehaviour:
   pinMode: 0
   isGroundPin: 0
   isPowerPin: 0
+  colliderRadius: 0.15
   normalColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   connectedColor: {r: 0, g: 1, b: 0, a: 1}
 --- !u!1 &7732652353240786134
@@ -2139,6 +2153,7 @@ MonoBehaviour:
   pinMode: 0
   isGroundPin: 0
   isPowerPin: 0
+  colliderRadius: 0.15
   normalColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   connectedColor: {r: 0, g: 1, b: 0, a: 1}
 --- !u!1 &7812200320398400471
@@ -2263,6 +2278,7 @@ MonoBehaviour:
   pinMode: 0
   isGroundPin: 0
   isPowerPin: 0
+  colliderRadius: 0.15
   normalColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   connectedColor: {r: 0, g: 1, b: 0, a: 1}
 --- !u!1 &8867647309338237903

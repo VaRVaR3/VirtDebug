@@ -5,7 +5,7 @@ public class InteractionManager : MonoBehaviour
 {
     public static InteractionManager Instance;
 
-    [Header("Raycast Masks (default: Everything)")]
+    [Header("Raycast Masks")]
     public LayerMask pinMask = ~0;
     public LayerMask componentMask = ~0;
     public LayerMask boardMask = ~0;
@@ -33,7 +33,11 @@ public class InteractionManager : MonoBehaviour
 
     private Camera cam;
 
-    private DraggableComponent dragging;
+    // мы держим transform, а не конкретный класс
+    private Transform draggingTransform;
+    private DraggableComponent draggingDraggable;
+    private ComponentDragger draggingLegacy;
+
     private Vector3 grabOffset;
     private float dragY;
 
@@ -44,7 +48,7 @@ public class InteractionManager : MonoBehaviour
 
         cam = Camera.main;
         if (cam == null)
-            Debug.LogError("❌ InteractionManager: Camera.main == null. Проверь, что у камеры стоит Tag = MainCamera.");
+            Debug.LogError("❌ InteractionManager: Camera.main == null. Проверь Tag = MainCamera");
         else if (debugLogs)
             Debug.Log("✅ InteractionManager initialized. Camera = " + cam.name);
     }
@@ -53,18 +57,16 @@ public class InteractionManager : MonoBehaviour
     {
         if (cam == null) return;
 
-        // Если мышь над UI — не трогаем сцену
         if (IsPointerOverBlockingUI())
             return;
-
 
         if (Input.GetMouseButtonDown(0))
             HandleMouseDown();
 
-        if (dragging != null && Input.GetMouseButton(0))
+        if (draggingTransform != null && Input.GetMouseButton(0))
             UpdateDrag();
 
-        if (dragging != null && Input.GetMouseButtonUp(0))
+        if (draggingTransform != null && Input.GetMouseButtonUp(0))
             EndDrag();
     }
 
@@ -72,23 +74,20 @@ public class InteractionManager : MonoBehaviour
     {
         Ray ray = cam.ScreenPointToRay(Input.mousePosition);
 
-        // Для диагностики: что вообще под курсором?
         if (debugLogs)
         {
             if (Physics.Raycast(ray, out RaycastHit anyHit, maxDistance, ~0, QueryTriggerInteraction.Collide))
-            {
                 Debug.Log($"🟦 Click hit: {anyHit.collider.name} (layer={LayerMask.LayerToName(anyHit.collider.gameObject.layer)})");
-            }
             else
-            {
                 Debug.Log("🟦 Click hit: nothing");
-            }
         }
 
-        // 1) PIN приоритетнее (важно QueryTriggerInteraction.Collide!)
+        // 1) PIN first
         if (Physics.Raycast(ray, out RaycastHit hitPin, maxDistance, pinMask, QueryTriggerInteraction.Collide))
         {
-            UltraSimplePin pin = hitPin.collider.GetComponentInParent<UltraSimplePin>();
+            UltraSimplePin pin = hitPin.collider.GetComponent<UltraSimplePin>() ??
+                                 hitPin.collider.GetComponentInParent<UltraSimplePin>();
+
             if (pin != null)
             {
                 if (debugLogs) Debug.Log($"🟡 PIN click: {pin.name} pinNumber={pin.pinNumber}");
@@ -97,36 +96,104 @@ public class InteractionManager : MonoBehaviour
             }
         }
 
-        // 2) COMPONENT
+        // 2) COMPONENT drag
         if (Physics.Raycast(ray, out RaycastHit hitComp, maxDistance, componentMask, QueryTriggerInteraction.Collide))
         {
-            DraggableComponent drag = hitComp.collider.GetComponentInParent<DraggableComponent>();
-            if (drag != null && drag.canDrag)
+            // СНАЧАЛА ищем DraggableComponent (у тебя он реально есть)
+            DraggableComponent draggable =
+                hitComp.collider.GetComponent<DraggableComponent>() ??
+                hitComp.collider.GetComponentInParent<DraggableComponent>();
+
+            if (draggable != null)
             {
-                if (debugLogs) Debug.Log($"🟩 COMPONENT drag start: {drag.name}");
-                BeginDrag(drag);
+                if (!draggable.canDrag)
+                {
+                    if (debugLogs) Debug.Log("🟧 Drag blocked: DraggableComponent.canDrag = false");
+                    return;
+                }
+
+                // если идёт соединение — запрещаем драг
+                if (SuperSimpleConnectionManager.Instance != null && SuperSimpleConnectionManager.Instance.isConnecting)
+                {
+                    if (debugLogs) Debug.Log("🟧 Drag blocked: currently connecting pins");
+                    return;
+                }
+
+                if (debugLogs) Debug.Log($"🟩 COMPONENT drag start (DraggableComponent): {draggable.name}");
+                BeginDrag(draggable);
                 return;
             }
+
+            // fallback: если вдруг где-то остался старый ComponentDragger
+            ComponentDragger legacy =
+                hitComp.collider.GetComponent<ComponentDragger>() ??
+                hitComp.collider.GetComponentInParent<ComponentDragger>();
+
+            if (legacy != null)
+            {
+                if (SuperSimpleConnectionManager.Instance != null && SuperSimpleConnectionManager.Instance.isConnecting)
+                {
+                    if (debugLogs) Debug.Log("🟧 Drag blocked: currently connecting pins");
+                    return;
+                }
+
+                CircuitComponent circuit = legacy.GetComponent<CircuitComponent>();
+                if (circuit != null && !circuit.isActive)
+                {
+                    if (debugLogs) Debug.LogWarning("🟧 Drag blocked: burned component (CircuitComponent.isActive = false)");
+                    return;
+                }
+
+                if (debugLogs) Debug.Log($"🟩 COMPONENT drag start (ComponentDragger): {legacy.name}");
+                BeginDrag(legacy);
+                return;
+            }
+
+            if (debugLogs)
+                Debug.Log($"🟥 No draggable script found on '{hitComp.collider.name}' or parents. Path: {GetFullPath(hitComp.collider.transform)}");
         }
     }
 
+    // --- BEGIN DRAG overloads ---
+
     private void BeginDrag(DraggableComponent drag)
     {
-        // если идёт соединение — запрещаем драг
-        if (SuperSimpleConnectionManager.Instance != null && SuperSimpleConnectionManager.Instance.isConnecting)
-            return;
+        draggingDraggable = drag;
+        draggingLegacy = null;
+        draggingTransform = drag.transform;
 
-        dragging = drag;
-        dragging.OnDragStart();
-
-        dragY = dragging.transform.position.y;
+        dragY = draggingTransform.position.y;
 
         // lift
-        dragging.transform.position = new Vector3(dragging.transform.position.x, dragY + liftHeight, dragging.transform.position.z);
+        draggingTransform.position = new Vector3(
+            draggingTransform.position.x,
+            dragY + liftHeight,
+            draggingTransform.position.z
+        );
 
-        // offset по плоскости Y=dragY — чтобы НЕ тянуло к камере
         Vector3 mouseOnPlane = MouseOnPlane(dragY);
-        grabOffset = dragging.transform.position - mouseOnPlane;
+        grabOffset = draggingTransform.position - mouseOnPlane;
+
+        drag.OnDragStart();
+        SuperSimpleConnectionManager.Instance?.UpdateAllWires();
+    }
+
+    private void BeginDrag(ComponentDragger drag)
+    {
+        draggingLegacy = drag;
+        draggingDraggable = null;
+        draggingTransform = drag.transform;
+
+        dragY = draggingTransform.position.y;
+
+        draggingTransform.position = new Vector3(
+            draggingTransform.position.x,
+            dragY + liftHeight,
+            draggingTransform.position.z
+        );
+
+        Vector3 mouseOnPlane = MouseOnPlane(dragY);
+        grabOffset = draggingTransform.position - mouseOnPlane;
 
         SuperSimpleConnectionManager.Instance?.UpdateAllWires();
     }
@@ -134,14 +201,13 @@ public class InteractionManager : MonoBehaviour
     private void UpdateDrag()
     {
         bool vertical = Input.GetKey(verticalModifier);
-
-        Vector3 target = dragging.transform.position;
+        Vector3 target = draggingTransform.position;
 
         if (vertical)
         {
             float dy = Input.GetAxis("Mouse Y") * verticalSpeed;
             dragY = Mathf.Clamp(dragY + dy, minY, maxY);
-            target = new Vector3(dragging.transform.position.x, dragY + liftHeight, dragging.transform.position.z);
+            target = new Vector3(draggingTransform.position.x, dragY + liftHeight, draggingTransform.position.z);
         }
         else
         {
@@ -156,21 +222,26 @@ public class InteractionManager : MonoBehaviour
             }
         }
 
-        dragging.transform.position = Vector3.Lerp(dragging.transform.position, target, Time.deltaTime * dragLerp);
+        draggingTransform.position = Vector3.Lerp(draggingTransform.position, target, Time.deltaTime * dragLerp);
 
         float scroll = Input.GetAxis("Mouse ScrollWheel");
         if (Mathf.Abs(scroll) > 0.0001f)
-            dragging.transform.Rotate(0f, scroll * rotationSpeed, 0f, Space.World);
+            draggingTransform.Rotate(0f, scroll * rotationSpeed, 0f, Space.World);
 
+        draggingDraggable?.OnDragUpdate();
         SuperSimpleConnectionManager.Instance?.UpdateAllWires();
-        dragging.OnDragUpdate();
     }
 
     private void EndDrag()
     {
-        dragging.transform.position = new Vector3(dragging.transform.position.x, dragY, dragging.transform.position.z);
-        dragging.OnDragEnd();
-        dragging = null;
+        // опускаем обратно
+        draggingTransform.position = new Vector3(draggingTransform.position.x, dragY, draggingTransform.position.z);
+
+        draggingDraggable?.OnDragEnd();
+
+        draggingTransform = null;
+        draggingDraggable = null;
+        draggingLegacy = null;
 
         SuperSimpleConnectionManager.Instance?.UpdateAllWires();
     }
@@ -179,7 +250,6 @@ public class InteractionManager : MonoBehaviour
     {
         Ray ray = cam.ScreenPointToRay(Input.mousePosition);
 
-        // ВАЖНО: тоже QueryTriggerInteraction.Collide
         if (Physics.Raycast(ray, out RaycastHit hit, maxDistance, boardMask, QueryTriggerInteraction.Collide))
             return hit.point;
 
@@ -192,26 +262,15 @@ public class InteractionManager : MonoBehaviour
         Plane plane = new Plane(Vector3.up, new Vector3(0f, yPlane, 0f));
         if (plane.Raycast(ray, out float dist))
             return ray.GetPoint(dist);
-
         return Vector3.zero;
     }
-
 
     private bool IsPointerOverBlockingUI()
     {
         if (EventSystem.current == null) return false;
+        if (!EventSystem.current.IsPointerOverGameObject()) return false;
 
-        // Если нет попаданий по UI — не блокируем
-        if (!EventSystem.current.IsPointerOverGameObject())
-            return false;
-
-        // Проверяем, есть ли под курсором "блокирующий" UI
-        // (кнопки / поля ввода и т.п.)
-        var pointer = new PointerEventData(EventSystem.current)
-        {
-            position = Input.mousePosition
-        };
-
+        var pointer = new PointerEventData(EventSystem.current) { position = Input.mousePosition };
         var results = new System.Collections.Generic.List<RaycastResult>();
         EventSystem.current.RaycastAll(pointer, results);
 
@@ -219,7 +278,6 @@ public class InteractionManager : MonoBehaviour
         {
             if (r.gameObject == null) continue;
 
-            // Если это интерактивный UI — блокируем сцену
             if (r.gameObject.GetComponent<UnityEngine.UI.Button>() != null) return true;
             if (r.gameObject.GetComponent<TMPro.TMP_InputField>() != null) return true;
             if (r.gameObject.GetComponent<UnityEngine.UI.InputField>() != null) return true;
@@ -230,8 +288,18 @@ public class InteractionManager : MonoBehaviour
             if (r.gameObject.GetComponent<TMPro.TMP_Dropdown>() != null) return true;
         }
 
-        // UI есть, но он не интерактивный (фон/декор) — не блокируем
         return false;
     }
 
+    private string GetFullPath(Transform t)
+    {
+        if (t == null) return "null";
+        string path = t.name;
+        while (t.parent != null)
+        {
+            t = t.parent;
+            path = t.name + "/" + path;
+        }
+        return path;
+    }
 }

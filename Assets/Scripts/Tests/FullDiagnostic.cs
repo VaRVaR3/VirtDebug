@@ -5,126 +5,70 @@ public class FullDiagnostic : MonoBehaviour
 {
     void Update()
     {
-        if (Input.GetKeyDown(KeyCode.F1))
-        {
-            RunFullDiagnostic();
-        }
-
-        if (Input.GetKeyDown(KeyCode.F2))
-        {
-            FixAllProblems();
-        }
+        if (Input.GetKeyDown(KeyCode.F1)) RunFullDiagnostic();
+        if (Input.GetKeyDown(KeyCode.F2)) FixAllProblems();
     }
 
     void RunFullDiagnostic()
     {
         Debug.Log("=== ПОЛНАЯ ДИАГНОСТИКА СИСТЕМЫ ===");
 
-        // 1. Проверка базовых систем
-        Debug.Log("1. Проверка базовых систем:");
+        // 1) База
+        Debug.Log("1) База:");
+        Debug.Log(Camera.main == null ? "❌ Camera.main = null" : "✅ Camera.main OK");
+        Debug.Log(FindObjectOfType<EventSystem>() == null ? "⚠️ EventSystem не найден" : "✅ EventSystem OK");
 
-        if (Camera.main == null)
-            Debug.LogError("❌ Основная камера не найдена!");
-        else
-            Debug.Log("✅ Основная камера найдена");
+        // 2) Менеджеры
+        Debug.Log("\n2) Менеджеры:");
+        Debug.Log(FindObjectOfType<InteractionManager>() == null ? "❌ InteractionManager НЕ найден" : "✅ InteractionManager найден");
+        Debug.Log(SuperSimpleConnectionManager.Instance == null ? "❌ SuperSimpleConnectionManager.Instance = null" : $"✅ ConnectionManager OK | isConnecting={SuperSimpleConnectionManager.Instance.isConnecting}");
 
-        if (FindObjectOfType<EventSystem>() == null)
-            Debug.LogWarning("⚠️ EventSystem не найден (нужен для UI)");
-        else
-            Debug.Log("✅ EventSystem найден");
+        // 3) Объекты
+        Debug.Log("\n3) Компоненты:");
+        var arduinos = FindObjectsOfType<VirtualArduino>();
+        var leds = FindObjectsOfType<VirtualLED>();
+        Debug.Log($"Arduino: {arduinos.Length} шт");
+        Debug.Log($"LED: {leds.Length} шт");
 
-        // 2. Проверка ConnectionManager
-        Debug.Log("\n2. Проверка ConnectionManager:");
+        // 4) Пины UltraSimplePin
+        Debug.Log("\n4) UltraSimplePin:");
+        UltraSimplePin[] pins = FindObjectsOfType<UltraSimplePin>(true);
+        Debug.Log($"UltraSimplePin в сцене: {pins.Length}");
 
-        if (SuperSimpleConnectionManager.Instance == null)
-            Debug.LogError("❌ ConnectionManager.Instance = NULL!");
-        else
+        int pinsNoCollider = 0;
+        int pinsNonTrigger = 0;
+
+        foreach (var p in pins)
         {
-            Debug.Log("✅ ConnectionManager.Instance существует");
-            Debug.Log($"   isConnecting: {SuperSimpleConnectionManager.Instance.isConnecting}");
+            Collider c = p.GetComponent<Collider>();
+            if (c == null) pinsNoCollider++;
+            else if (!c.isTrigger) pinsNonTrigger++;
+
+            string layerName = LayerMask.LayerToName(p.gameObject.layer);
+            Debug.Log($"  Pin {p.pinNumber} | obj={p.name} | layer={layerName} | collider={(c ? c.GetType().Name : "NONE")} | trigger={(c ? c.isTrigger.ToString() : "-")}");
         }
 
-        // 3. Проверка компонентов
-        Debug.Log("\n3. Проверка компонентов:");
+        Debug.Log($"Пины без коллайдера: {pinsNoCollider}");
+        Debug.Log($"Пины с коллайдером, но НЕ trigger: {pinsNonTrigger}");
 
-        VirtualArduino arduino = FindObjectOfType<VirtualArduino>();
-        VirtualLED led = FindObjectOfType<VirtualLED>();
-
-        if (arduino == null)
-            Debug.LogError("❌ Arduino не найден!");
-        else
+        // 5) Компоненты для перетаскивания
+        Debug.Log("\n5) ComponentDragger:");
+        ComponentDragger[] drags = FindObjectsOfType<ComponentDragger>(true);
+        Debug.Log($"ComponentDragger объектов: {drags.Length}");
+        foreach (var d in drags)
         {
-            Debug.Log($"✅ Arduino найден: {arduino.name}");
-            // Проверяем пины Arduino
-            PinHighlighter[] arduinoPins = arduino.GetComponentsInChildren<PinHighlighter>();
-            Debug.Log($"   Пины Arduino: {arduinoPins.Length} шт");
+            string layerName = LayerMask.LayerToName(d.gameObject.layer);
+            Debug.Log($"  {d.name} | canDrag={d.canDrag} | layer={layerName} | collider={(d.GetComponent<Collider>() ? "yes" : "NO")}");
         }
-
-        if (led == null)
-            Debug.LogError("❌ LED не найден!");
-        else
-        {
-            Debug.Log($"✅ LED найден: {led.name}");
-            // Проверяем пины LED
-            PinHighlighter[] ledPins = led.GetComponentsInChildren<PinHighlighter>();
-            Debug.Log($"   Пины LED: {ledPins.Length} шт");
-        }
-
-        // 4. Проверка PinHighlighter
-        Debug.Log("\n4. Проверка PinHighlighter:");
-
-        PinHighlighter[] allPins = FindObjectsOfType<PinHighlighter>();
-        Debug.Log($"Всего пинов в сцене: {allPins.Length}");
-
-        foreach (var pin in allPins)
-        {
-            Debug.Log($"   Пин {pin.pinNumber} на {pin.transform.parent?.name}: " +
-                     $"parentComponent={(pin.parentComponent != null ? "да" : "нет")}, " +
-                     $"isConnected={pin.isConnected}");
-        }
-
-        // 5. Проверка ComponentDragger
-        Debug.Log("\n5. Проверка ComponentDragger:");
-
-        ComponentDragger[] draggers = FindObjectsOfType<ComponentDragger>();
-        Debug.Log($"ComponentDragger объектов: {draggers.Length}");
-
-        foreach (var dragger in draggers)
-        {
-            Debug.Log($"   {dragger.gameObject.name}: isDragging={dragger.isDragging}");
-        }
-
-        // 6. Проверка коллайдеров
-        Debug.Log("\n6. Проверка коллайдеров:");
-
-        Collider[] colliders = FindObjectsOfType<Collider>();
-        Debug.Log($"Коллайдеров в сцене: {colliders.Length}");
-
-        // Проверяем коллайдеры на пинах
-        int pinsWithColliders = 0;
-        foreach (var pin in allPins)
-        {
-            if (pin.GetComponent<Collider>() != null)
-                pinsWithColliders++;
-        }
-        Debug.Log($"Пины с коллайдерами: {pinsWithColliders}/{allPins.Length}");
-
-        // 7. Проверка Layer'ов
-        Debug.Log("\n7. Проверка Layer'ов:");
-
-        if (LayerMask.NameToLayer("Default") == -1)
-            Debug.LogError("❌ Слой Default не найден!");
-        else
-            Debug.Log("✅ Слой Default существует");
 
         Debug.Log("=== ДИАГНОСТИКА ЗАВЕРШЕНА ===");
     }
 
     void FixAllProblems()
     {
-        Debug.Log("=== ИСПРАВЛЕНИЕ ПРОБЛЕМ ===");
+        Debug.Log("=== FIX ALL PROBLEMS ===");
 
-        // 1. Создаем EventSystem если нет
+        // 1) EventSystem
         if (FindObjectOfType<EventSystem>() == null)
         {
             GameObject es = new GameObject("EventSystem");
@@ -133,114 +77,71 @@ public class FullDiagnostic : MonoBehaviour
             Debug.Log("✅ Создан EventSystem");
         }
 
-        // 2. Проверяем и создаем ConnectionManager если нет
+        // 2) InteractionManager
+        if (FindObjectOfType<InteractionManager>() == null)
+        {
+            GameObject im = new GameObject("InteractionManager");
+            im.AddComponent<InteractionManager>();
+            Debug.Log("✅ Создан InteractionManager");
+        }
+
+        // 3) ConnectionManager
         if (SuperSimpleConnectionManager.Instance == null)
         {
-            SuperSimpleConnectionManager cm = FindObjectOfType<SuperSimpleConnectionManager>();
+            var cm = FindObjectOfType<SuperSimpleConnectionManager>();
             if (cm == null)
             {
                 GameObject cmObj = new GameObject("ConnectionManager");
-                cm = cmObj.AddComponent<SuperSimpleConnectionManager>();
+                cmObj.AddComponent<SuperSimpleConnectionManager>();
                 Debug.Log("✅ Создан ConnectionManager");
             }
             else
             {
-                Debug.Log("✅ ConnectionManager найден, но Instance не установлен");
+                Debug.LogWarning("⚠️ ConnectionManager найден, но Instance не установлен (проверь Awake/дубликаты)");
             }
         }
 
-        // 3. Проверяем пины
-        PinHighlighter[] allPins = FindObjectsOfType<PinHighlighter>();
-        foreach (var pin in allPins)
+        // 4) Починка пинов: коллайдер + trigger
+        UltraSimplePin[] pins = FindObjectsOfType<UltraSimplePin>(true);
+        foreach (var p in pins)
         {
-            // Добавляем коллайдер если нет
-            if (pin.GetComponent<Collider>() == null)
+            Collider c = p.GetComponent<Collider>();
+            if (c == null)
             {
-                BoxCollider collider = pin.gameObject.AddComponent<BoxCollider>();
-                collider.size = new Vector3(0.2f, 0.2f, 0.2f);
-                collider.isTrigger = true;
-                Debug.Log($"✅ Добавлен коллайдер пину {pin.pinNumber}");
+                SphereCollider sc = p.gameObject.AddComponent<SphereCollider>();
+                sc.radius = 0.15f;
+                sc.isTrigger = true;
+                Debug.Log($"✅ Добавлен SphereCollider pin={p.pinNumber} ({p.name})");
             }
-
-            // Проверяем parentComponent
-            if (pin.parentComponent == null)
+            else
             {
-                // Вызываем метод FindParentComponent через reflection если он private
-                var method = typeof(PinHighlighter).GetMethod("FindParentComponent",
-                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                if (method != null)
+                if (!c.isTrigger)
                 {
-                    method.Invoke(pin, null);
-                    if (pin.parentComponent != null)
-                        Debug.Log($"✅ Найден parentComponent для пина {pin.pinNumber}");
+                    c.isTrigger = true;
+                    Debug.Log($"✅ Сделал collider.isTrigger=true pin={p.pinNumber} ({p.name})");
                 }
             }
         }
 
-        // 4. Проверяем компоненты
-        VirtualArduino arduino = FindObjectOfType<VirtualArduino>();
-        if (arduino != null)
-        {
-            // Проверяем наличие ComponentDragger
-            if (arduino.GetComponent<ComponentDragger>() == null)
-            {
-                arduino.gameObject.AddComponent<ComponentDragger>();
-                Debug.Log($"✅ Добавлен ComponentDragger к Arduino");
-            }
-        }
-
-        VirtualLED led = FindObjectOfType<VirtualLED>();
-        if (led != null)
-        {
-            // Проверяем наличие ComponentDragger
-            if (led.GetComponent<ComponentDragger>() == null)
-            {
-                led.gameObject.AddComponent<ComponentDragger>();
-                Debug.Log($"✅ Добавлен ComponentDragger к LED");
-            }
-        }
-
-        Debug.Log("=== ИСПРАВЛЕНИЯ ЗАВЕРШЕНЫ ===");
+        Debug.Log("=== FIX DONE ===");
     }
 
     void OnGUI()
     {
-        GUIStyle style = new GUIStyle();
-        style.fontSize = 20;
+        GUIStyle style = new GUIStyle { fontSize = 18 };
         style.normal.textColor = Color.white;
 
         int y = 10;
-        GUI.Label(new Rect(10, y, 400, 30), "F1 - Полная диагностика системы", style); y += 30;
-        GUI.Label(new Rect(10, y, 400, 30), "F2 - Автоматическое исправление проблем", style); y += 30;
+        GUI.Label(new Rect(10, y, 600, 30), "F1 - Полная диагностика", style); y += 26;
+        GUI.Label(new Rect(10, y, 600, 30), "F2 - Авто-фикс (EventSystem/Managers/Pin Colliders)", style); y += 26;
 
-        // Показываем состояние системы
-        y += 20;
-        GUI.Label(new Rect(10, y, 400, 30), "=== СТАТУС СИСТЕМЫ ===", style); y += 30;
+        y += 10;
+        string cm = SuperSimpleConnectionManager.Instance == null ? "❌ null" : (SuperSimpleConnectionManager.Instance.isConnecting ? "✅ CONNECTING" : "✅ IDLE");
+        GUI.Label(new Rect(10, y, 600, 30), $"ConnectionManager: {cm}", style); y += 26;
 
-        if (SuperSimpleConnectionManager.Instance == null)
-            GUI.Label(new Rect(10, y, 400, 30), "ConnectionManager: ❌ НЕ НАЙДЕН", style);
-        else
-        {
-            string status = SuperSimpleConnectionManager.Instance.isConnecting ? "CONNECTING" : "IDLE";
-            GUI.Label(new Rect(10, y, 400, 30), $"ConnectionManager: ✅ ({status})", style);
-        }
-        y += 30;
+        string im = FindObjectOfType<InteractionManager>() == null ? "❌ null" : "✅ OK";
+        GUI.Label(new Rect(10, y, 600, 30), $"InteractionManager: {im}", style); y += 26;
 
-        VirtualArduino arduino = FindObjectOfType<VirtualArduino>();
-        if (arduino == null)
-            GUI.Label(new Rect(10, y, 400, 30), "Arduino: ❌ НЕ НАЙДЕН", style);
-        else
-            GUI.Label(new Rect(10, y, 400, 30), $"Arduino: ✅ ({arduino.name})", style);
-        y += 30;
-
-        VirtualLED led = FindObjectOfType<VirtualLED>();
-        if (led == null)
-            GUI.Label(new Rect(10, y, 400, 30), "LED: ❌ НЕ НАЙДЕН", style);
-        else
-            GUI.Label(new Rect(10, y, 400, 30), $"LED: ✅ ({led.name}, активен: {led.isActive})", style);
-        y += 30;
-
-        PinHighlighter[] pins = FindObjectsOfType<PinHighlighter>();
-        GUI.Label(new Rect(10, y, 400, 30), $"Пинов в сцене: {pins.Length}", style);
+        GUI.Label(new Rect(10, y, 600, 30), $"UltraSimplePin count: {FindObjectsOfType<UltraSimplePin>(true).Length}", style);
     }
 }

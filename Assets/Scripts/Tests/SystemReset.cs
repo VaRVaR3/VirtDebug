@@ -4,55 +4,30 @@ public class SystemReset : MonoBehaviour
 {
     void Update()
     {
-        if (Input.GetKeyDown(KeyCode.R))
-        {
-            ResetEverything();
-        }
-
-        if (Input.GetKeyDown(KeyCode.T))
-        {
-            TestBasicInteraction();
-        }
-
-        if (Input.GetKeyDown(KeyCode.Y))
-        {
-            CreateTestEnvironment();
-        }
+        if (Input.GetKeyDown(KeyCode.R)) ResetEverything();
+        if (Input.GetKeyDown(KeyCode.T)) TestBasicRaycast();
+        if (Input.GetKeyDown(KeyCode.Y)) CreateTestEnvironment();
     }
 
     void ResetEverything()
     {
-        Debug.Log("=== ПОЛНЫЙ СБРОС СИСТЕМЫ ===");
+        Debug.Log("=== RESET EVERYTHING ===");
 
-        // Удаляем все провода
+        // Удаляем провода
         WireVisual[] wires = FindObjectsOfType<WireVisual>();
-        foreach (var wire in wires)
-        {
-            Destroy(wire.gameObject);
-        }
-        Debug.Log($"Удалено проводов: {wires.Length}");
+        foreach (var w in wires) Destroy(w.gameObject);
+        Debug.Log($"Удалено WireVisual: {wires.Length}");
 
         // Сбрасываем ConnectionManager
         if (SuperSimpleConnectionManager.Instance != null)
         {
             SuperSimpleConnectionManager.Instance.DisconnectAll();
-            Debug.Log("ConnectionManager сброшен");
+            SuperSimpleConnectionManager.Instance.ClearAllWires();
+            Debug.Log("✅ ConnectionManager очищен");
         }
 
-        // Сбрасываем все пины
-        PinHighlighter[] pins = FindObjectsOfType<PinHighlighter>();
-        foreach (var pin in pins)
-        {
-            pin.isConnected = false;
-            // Обновляем цвет
-            if (pin.GetComponent<Renderer>() != null)
-                pin.GetComponent<Renderer>().material.color = Color.white;
-        }
-        Debug.Log($"Сброшено пинов: {pins.Length}");
-
-        // Сбрасываем компоненты
-        VirtualLED[] leds = FindObjectsOfType<VirtualLED>();
-        foreach (var led in leds)
+        // Сбрасываем LED
+        foreach (var led in FindObjectsOfType<VirtualLED>())
         {
             led.positivePin = -1;
             led.negativePin = -1;
@@ -60,187 +35,102 @@ public class SystemReset : MonoBehaviour
             led.isActive = true;
         }
 
-        VirtualArduino[] arduinos = FindObjectsOfType<VirtualArduino>();
-        foreach (var arduino in arduinos)
+        // Сбрасываем Arduino pin voltages
+        foreach (var arduino in FindObjectsOfType<VirtualArduino>())
         {
             for (int i = 0; i < arduino.digitalPins.Count; i++)
             {
                 arduino.digitalPins[i].isConnected = false;
                 arduino.digitalPins[i].connectedComponent = null;
                 arduino.digitalPins[i].voltage = 0f;
+                arduino.digitalPins[i].current = 0f;
             }
         }
 
-        Debug.Log("=== СБРОС ЗАВЕРШЕН ===");
+        Debug.Log("=== RESET DONE ===");
     }
 
-    void TestBasicInteraction()
+    void TestBasicRaycast()
     {
-        Debug.Log("=== ТЕСТ БАЗОВОГО ВЗАИМОДЕЙСТВИЯ ===");
-
-        // Тест 1: Проверка коллайдеров
-        Debug.Log("1. Тест коллайдеров:");
-
-        VirtualArduino arduino = FindObjectOfType<VirtualArduino>();
-        VirtualLED led = FindObjectOfType<VirtualLED>();
-
-        if (arduino != null)
+        if (Camera.main == null)
         {
-            Collider arduinoCollider = arduino.GetComponent<Collider>();
-            Debug.Log($"Arduino коллайдер: {arduinoCollider != null}");
+            Debug.LogError("Camera.main == null");
+            return;
         }
 
-        if (led != null)
+        Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+        Debug.DrawRay(ray.origin, ray.direction * 50, Color.red, 1f);
+
+        if (Physics.Raycast(ray, out RaycastHit hit, 200f, ~0, QueryTriggerInteraction.Collide))
         {
-            Collider ledCollider = led.GetComponent<Collider>();
-            Debug.Log($"LED коллайдер: {ledCollider != null}");
-        }
+            Debug.Log($"Mouse hit: {hit.collider.name} layer={LayerMask.LayerToName(hit.collider.gameObject.layer)}");
 
-        // Тест 2: Raycast от камеры
-        Debug.Log("\n2. Тест Raycast:");
+            var pin = hit.collider.GetComponentInParent<UltraSimplePin>();
+            var drag = hit.collider.GetComponentInParent<ComponentDragger>();
 
-        Ray ray = Camera.main.ScreenPointToRay(new Vector3(Screen.width / 2, Screen.height / 2, 0));
-        Debug.DrawRay(ray.origin, ray.direction * 100, Color.red, 2f);
-
-        if (Physics.Raycast(ray, out RaycastHit hit))
-        {
-            Debug.Log($"Raycast попал в: {hit.collider.name}");
-            Debug.Log($"Тэг: {hit.collider.tag}, Слой: {hit.collider.gameObject.layer}");
+            Debug.Log($"UltraSimplePin? {(pin != null)} | ComponentDragger? {(drag != null)}");
+            if (pin != null) Debug.Log($"PinNumber={pin.pinNumber}");
         }
         else
         {
-            Debug.LogError("❌ Raycast НЕ попадает ни во что!");
+            Debug.Log("Mouse hit: nothing");
         }
-
-        // Тест 3: Проверка мыши
-        Debug.Log("\n3. Тест мыши:");
-        Debug.Log($"Позиция мыши: {Input.mousePosition}");
-
-        Ray mouseRay = Camera.main.ScreenPointToRay(Input.mousePosition);
-        if (Physics.Raycast(mouseRay, out RaycastHit mouseHit))
-        {
-            Debug.Log($"Мышь указывает на: {mouseHit.collider.name}");
-
-            // Проверяем есть ли компоненты
-            ComponentDragger dragger = mouseHit.collider.GetComponent<ComponentDragger>();
-            PinHighlighter pin = mouseHit.collider.GetComponent<PinHighlighter>();
-
-            Debug.Log($"ComponentDragger: {dragger != null}");
-            Debug.Log($"PinHighlighter: {pin != null}");
-
-            if (pin != null)
-            {
-                Debug.Log($"Пин {pin.pinNumber}: parentComponent={pin.parentComponent != null}");
-            }
-        }
-
-        Debug.Log("=== ТЕСТ ЗАВЕРШЕН ===");
     }
 
     void CreateTestEnvironment()
     {
-        Debug.Log("=== СОЗДАНИЕ ТЕСТОВОГО ОКРУЖЕНИЯ ===");
+        Debug.Log("=== CREATE TEST ENV ===");
 
-        // Создаем простой куб для теста перетаскивания
-        GameObject testCube = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        testCube.name = "TestCube";
-        testCube.transform.position = new Vector3(0, 0.5f, 0);
-        testCube.transform.localScale = new Vector3(0.5f, 0.5f, 0.5f);
-        testCube.GetComponent<Renderer>().material.color = Color.blue;
+        // Test cube for drag
+        GameObject cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        cube.name = "TestCube";
+        cube.transform.position = new Vector3(0, 0.5f, 0);
+        cube.AddComponent<ComponentDragger>(); // метка
+        Debug.Log("✅ TestCube создан");
 
-        // Добавляем ComponentDragger
-        ComponentDragger dragger = testCube.AddComponent<ComponentDragger>();
-        dragger.dragSpeed = 15f;
-        dragger.useGrid = false;
+        // Test pin (кликабельный)
+        GameObject pinObj = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        pinObj.name = "TestPin";
+        pinObj.transform.position = new Vector3(2, 0.5f, 0);
+        var usp = pinObj.AddComponent<UltraSimplePin>();
+        usp.pinNumber = 99;
+        pinObj.AddComponent<TestConnectable>(); // parent IConnectable — на этом же объекте (ok)
 
-        // Добавляем простой коллайдер если нет
-        if (testCube.GetComponent<Collider>() == null)
-        {
-            testCube.AddComponent<BoxCollider>();
-        }
+        Debug.Log("✅ TestPin создан");
 
-        Debug.Log("✅ Создан TestCube с ComponentDragger");
-
-        // Создаем простой пин для теста
-        GameObject testPin = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        testPin.name = "TestPin";
-        testPin.transform.position = new Vector3(2, 0.5f, 0);
-        testPin.transform.localScale = new Vector3(0.2f, 0.2f, 0.2f);
-        testPin.GetComponent<Renderer>().material.color = Color.green;
-
-        // Добавляем PinHighlighter
-        PinHighlighter pinHighlighter = testPin.AddComponent<PinHighlighter>();
-        pinHighlighter.pinNumber = 99;
-        pinHighlighter.pinMode = PinMode.Output;
-
-        // Настраиваем тестовый parentComponent
-        testPin.AddComponent<TestConnectable>();
-
-        Debug.Log("✅ Создан TestPin с PinHighlighter");
-
-        // Создаем ConnectionManager если нет
         if (SuperSimpleConnectionManager.Instance == null)
         {
-            GameObject cmObj = new GameObject("ConnectionManager");
-            cmObj.AddComponent<SuperSimpleConnectionManager>();
+            GameObject cm = new GameObject("ConnectionManager");
+            cm.AddComponent<SuperSimpleConnectionManager>();
             Debug.Log("✅ Создан ConnectionManager");
         }
 
-        Debug.Log("=== ТЕСТОВОЕ ОКРУЖЕНИЕ СОЗДАНО ===");
+        if (FindObjectOfType<InteractionManager>() == null)
+        {
+            GameObject im = new GameObject("InteractionManager");
+            im.AddComponent<InteractionManager>();
+            Debug.Log("✅ Создан InteractionManager");
+        }
     }
 
     void OnGUI()
     {
-        GUIStyle style = new GUIStyle();
-        style.fontSize = 20;
+        GUIStyle style = new GUIStyle { fontSize = 18 };
         style.normal.textColor = Color.white;
 
-        int y = 50;
-        GUI.Label(new Rect(10, y, 400, 30), "R - Полный сброс системы", style); y += 30;
-        GUI.Label(new Rect(10, y, 400, 30), "T - Тест базового взаимодействия", style); y += 30;
-        GUI.Label(new Rect(10, y, 400, 30), "Y - Создать тестовое окружение", style); y += 30;
-
-        y += 20;
-        GUI.Label(new Rect(10, y, 400, 30), "=== ТЕКУЩИЙ СТАТУС ===", style); y += 30;
-
-        // Статус мыши
-        Ray mouseRay = Camera.main.ScreenPointToRay(Input.mousePosition);
-        if (Physics.Raycast(mouseRay, out RaycastHit hit))
-        {
-            GUI.Label(new Rect(10, y, 400, 30), $"Мышь на: {hit.collider.name}", style);
-        }
-        else
-        {
-            GUI.Label(new Rect(10, y, 400, 30), "Мышь: ничего не указывает", style);
-        }
+        int y = 10;
+        GUI.Label(new Rect(10, y, 600, 28), "R - Reset everything", style); y += 24;
+        GUI.Label(new Rect(10, y, 600, 28), "T - Test mouse raycast", style); y += 24;
+        GUI.Label(new Rect(10, y, 600, 28), "Y - Create test objects", style); y += 24;
     }
 }
 
-// Простой тестовый класс IConnectable
+// Тестовый IConnectable
 public class TestConnectable : MonoBehaviour, IConnectable
 {
-    public string GetName()
-    {
-        return name;
-    }
-
-    public void OnConnected(int pin, IConnectable otherComponent, int otherPin)
-    {
-        Debug.Log($"TestConnectable {name} подключен: пин {pin} -> {otherComponent.GetName()} пин {otherPin}");
-    }
-
-    public void OnDisconnected(int pin)
-    {
-        Debug.Log($"TestConnectable {name} отключен от пина {pin}");
-    }
-
-    public Vector3 GetPinPosition(int pin)
-    {
-        return transform.position;
-    }
-
-    public bool CanConnectTo(int pin, IConnectable otherComponent, int otherPin)
-    {
-        return true;
-    }
+    public string GetName() => name;
+    public void OnConnected(int pin, IConnectable otherComponent, int otherPin) => Debug.Log($"TestConnectable: {pin} -> {otherComponent.GetName()}:{otherPin}");
+    public void OnDisconnected(int pin) => Debug.Log($"TestConnectable: disconnected {pin}");
+    public Vector3 GetPinPosition(int pin) => transform.position;
+    public bool CanConnectTo(int pin, IConnectable otherComponent, int otherPin) => true;
 }
