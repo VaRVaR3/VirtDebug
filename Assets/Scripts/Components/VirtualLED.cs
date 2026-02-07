@@ -1,6 +1,7 @@
-﻿using UnityEngine;
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
+using UnityEngine;
+using static VirtualArduino;
 
 public class VirtualLED : CircuitComponent
 {
@@ -491,4 +492,27 @@ public class VirtualLED : CircuitComponent
     {
         return currentStatus;
     }
+
+    // Arduino сообщает: на какой пин LED пришло напряжение
+    public void OnArduinoVoltage(int ledPin, float voltage)
+    {
+        // ledPin: 1 = анод, 2 = катод
+        if (ledPin == 1)
+        {
+            // анод получил напряжение от Arduino
+            // катод обычно на GND, но если подключен к другому — можно расширить позже
+            float cathodeV = 0f;
+            OnVoltageChanged(voltage - cathodeV);
+            return;
+        }
+
+        if (ledPin == 2)
+        {
+            // катод получил напряжение (редко, но возможно)
+            float anodeV = Pin.OPERATING_VOLTAGE; // или 0f, зависит от схемы — пока упрощаем
+            OnVoltageChanged(anodeV - voltage);
+            return;
+        }
+    }
+
 }
