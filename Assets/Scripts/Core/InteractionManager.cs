@@ -33,7 +33,7 @@ public class InteractionManager : MonoBehaviour
 
     private Camera cam;
 
-    // мы держим transform, а не конкретный класс
+    // держим transform, а не конкретный класс
     private Transform draggingTransform;
     private DraggableComponent draggingDraggable;
     private ComponentDragger draggingLegacy;
@@ -85,8 +85,9 @@ public class InteractionManager : MonoBehaviour
         // 1) PIN first
         if (Physics.Raycast(ray, out RaycastHit hitPin, maxDistance, pinMask, QueryTriggerInteraction.Collide))
         {
-            UltraSimplePin pin = hitPin.collider.GetComponent<UltraSimplePin>() ??
-                                 hitPin.collider.GetComponentInParent<UltraSimplePin>();
+            UltraSimplePin pin =
+                hitPin.collider.GetComponent<UltraSimplePin>() ??
+                hitPin.collider.GetComponentInParent<UltraSimplePin>();
 
             if (pin != null)
             {
@@ -99,7 +100,7 @@ public class InteractionManager : MonoBehaviour
         // 2) COMPONENT drag
         if (Physics.Raycast(ray, out RaycastHit hitComp, maxDistance, componentMask, QueryTriggerInteraction.Collide))
         {
-            // СНАЧАЛА ищем DraggableComponent (у тебя он реально есть)
+            // СНАЧАЛА ищем DraggableComponent
             DraggableComponent draggable =
                 hitComp.collider.GetComponent<DraggableComponent>() ??
                 hitComp.collider.GetComponentInParent<DraggableComponent>();
@@ -112,7 +113,6 @@ public class InteractionManager : MonoBehaviour
                     return;
                 }
 
-                // если идёт соединение — запрещаем драг
                 if (SuperSimpleConnectionManager.Instance != null && SuperSimpleConnectionManager.Instance.isConnecting)
                 {
                     if (debugLogs) Debug.Log("🟧 Drag blocked: currently connecting pins");
@@ -124,7 +124,7 @@ public class InteractionManager : MonoBehaviour
                 return;
             }
 
-            // fallback: если вдруг где-то остался старый ComponentDragger
+            // fallback: старый ComponentDragger
             ComponentDragger legacy =
                 hitComp.collider.GetComponent<ComponentDragger>() ??
                 hitComp.collider.GetComponentInParent<ComponentDragger>();
@@ -234,7 +234,6 @@ public class InteractionManager : MonoBehaviour
 
     private void EndDrag()
     {
-        // опускаем обратно
         draggingTransform.position = new Vector3(draggingTransform.position.x, dragY, draggingTransform.position.z);
 
         draggingDraggable?.OnDragEnd();
@@ -250,8 +249,22 @@ public class InteractionManager : MonoBehaviour
     {
         Ray ray = cam.ScreenPointToRay(Input.mousePosition);
 
-        if (Physics.Raycast(ray, out RaycastHit hit, maxDistance, boardMask, QueryTriggerInteraction.Collide))
-            return hit.point;
+        RaycastHit[] hits = Physics.RaycastAll(ray, maxDistance, boardMask, QueryTriggerInteraction.Collide);
+        if (hits != null && hits.Length > 0)
+        {
+            System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+
+            foreach (var h in hits)
+            {
+                if (h.collider == null) continue;
+
+                // ✅ игнорим коллайдеры внутри того, что сейчас тащим
+                if (draggingTransform != null && h.transform.IsChildOf(draggingTransform))
+                    continue;
+
+                return h.point;
+            }
+        }
 
         return MouseOnPlane(yPlane);
     }

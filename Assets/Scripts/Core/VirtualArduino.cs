@@ -1,6 +1,7 @@
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using System;
 
 public class VirtualArduino : MonoBehaviour, IConnectable
 {
@@ -22,6 +23,8 @@ public class VirtualArduino : MonoBehaviour, IConnectable
         public Pin(int pinNumber)
         {
             number = pinNumber;
+
+            // PWM пины Arduino Uno (D3, D5, D6, D9, D10, D11)
             if (pinNumber == 3 || pinNumber == 5 || pinNumber == 6 ||
                 pinNumber == 9 || pinNumber == 10 || pinNumber == 11)
             {
@@ -34,83 +37,131 @@ public class VirtualArduino : MonoBehaviour, IConnectable
     public List<ArduinoGroundPin> groundPins = new List<ArduinoGroundPin>();
     public bool autoCreateGroundPins = true;
 
-    public List<Pin> digitalPins = new List<Pin>();
-    public List<Pin> analogPins = new List<Pin>();
+    [Header("Pins data")]
+    public List<Pin> digitalPins = new List<Pin>();   // D0..D12
+    public List<Pin> analogPins = new List<Pin>();    // A0..A5 храним как 0..5 (внутри)
     public Dictionary<string, string> variables = new Dictionary<string, string>();
 
+    // Соединения:
+    // ключ: нормализованный pin id:
+    //  - digital: 0..12
+    //  - analog: 300..305 (A0..A5)
     private Dictionary<int, List<WireConnection>> connections = new Dictionary<int, List<WireConnection>>();
 
     public event Action<int, int> OnDigitalWrite;
     public event Action<int, float> OnAnalogWrite;
     public event Action<string> OnSerialData;
 
+    // ===== QUICK TEST =====
+    [Header("Quick Test")]
+    [SerializeField] private int testPin = 9; // лучше PWM пин (3/5/6/9/10/11)
+    private bool testState = false;
+
     void Start()
     {
         InitializePins();
 
         if (autoCreateGroundPins)
-        {
             CreateGroundPins();
-        }
     }
 
-    // ========== IConnectable IMPLEMENTATION ==========
+    // ================== IConnectable ==================
 
-    public string GetName()
-    {
-        return name;
-    }
+    public string GetName() => name;
 
     public void OnConnected(int pin, IConnectable otherComponent, int otherPin)
     {
         Debug.Log($"Arduino {name}: pin {pin} connected to {otherComponent.GetName()}:{otherPin}");
+
+        // Регистрируем соединение:
+        // - digital 0..12
+        // - analog 300..305 (A0..A5)
+        if (IsDigitalPin(pin) || IsAnalogPinNumber(pin))
+        {
+            ConnectComponent(pin, otherComponent);
+        }
     }
 
     public void OnDisconnected(int pin)
     {
         Debug.Log($"Arduino {name}: pin {pin} disconnected");
+
+        int key = NormalizePinKey(pin);
+        if (connections.ContainsKey(key))
+            connections.Remove(key);
+
+        if (IsDigitalPin(pin))
+        {
+            digitalPins[pin].isConnected = false;
+            digitalPins[pin].connectedComponent = null;
+            digitalPins[pin].voltage = 0f;
+        }
     }
 
     public Vector3 GetPinPosition(int pin)
     {
-        // ������� ����� UltraSimplePin
-        UltraSimplePin[] ultraPins = GetComponentsInChildren<UltraSimplePin>();
+        UltraSimplePin[] ultraPins = GetComponentsInChildren<UltraSimplePin>(true);
         foreach (var pinObj in ultraPins)
-        {
             if (pinObj.pinNumber == pin)
-            {
                 return pinObj.transform.position;
-            }
-        }
 
-        // ���� UltraSimplePin �� ������, ������� ����� PinHighlighter
-        PinHighlighter[] oldPins = GetComponentsInChildren<PinHighlighter>();
+        PinHighlighter[] oldPins = GetComponentsInChildren<PinHighlighter>(true);
         foreach (var pinObj in oldPins)
-        {
             if (pinObj.pinNumber == pin)
-            {
                 return pinObj.transform.position;
-            }
-        }
 
-        // ��� GND �����
         foreach (var groundPin in groundPins)
-        {
             if (groundPin.pinNumber == pin)
-            {
                 return groundPin.transform.position;
-            }
+
+        return transform.position + new Vector3(0.1f * (pin % 10), 0f, 0.1f * (pin / 10));
+    }
+
+    public bool CanConnectTo(int pin, IConnectable otherComponent, int otherPin) => true;
+
+    // ================== Pin helpers ==================
+
+    private bool IsDigitalPin(int pin) => (pin >= 0 && pin < digitalPins.Count);
+
+    private bool IsAnalogPinNumber(int pinNumber)
+    {
+        // поддерживаем и 0..5 (если кто-то так вызвал), и 300..305 (визуальные A0..A5)
+        return (pinNumber >= 0 && pinNumber <= 5) || (pinNumber >= 300 && pinNumber <= 305);
+    }
+
+    private bool TryMapAnalogPinNumber(int pinNumber, out int analogIndex)
+    {
+        if (pinNumber >= 0 && pinNumber <= 5)
+        {
+            analogIndex = pinNumber;
+            return true;
         }
 
-        return transform.position + new Vector3(0.1f * (pin % 10), 0, 0.1f * (pin / 10));
+        if (pinNumber >= 300 && pinNumber <= 305)
+        {
+            analogIndex = pinNumber - 300;
+            return true;
+        }
+
+        analogIndex = -1;
+        return false;
     }
 
-    public bool CanConnectTo(int pin, IConnectable otherComponent, int otherPin)
+    // Ключ соединений:
+    // digital: 0..12
+    // analog: 300..305
+    private int NormalizePinKey(int pinNumber)
     {
-        return true;
+        if (IsDigitalPin(pinNumber))
+            return pinNumber;
+
+        if (TryMapAnalogPinNumber(pinNumber, out int aIdx))
+            return 300 + aIdx;
+
+        return pinNumber;
     }
 
-    // ========== ��������� ������ (��� ���������) ==========
+    // ================== Ground creation ==================
 
     void CreateGroundPins()
     {
@@ -138,6 +189,7 @@ public class VirtualArduino : MonoBehaviour, IConnectable
         groundPin.pinNumber = pinNumber;
         groundPin.pinName = pinName;
 
+        // Если хочешь полностью убрать PinHighlighter — удали это и используй UltraSimplePin
         PinHighlighter pinHighlighter = groundPinObj.AddComponent<PinHighlighter>();
         pinHighlighter.pinNumber = pinNumber;
         pinHighlighter.isGroundPin = true;
@@ -153,34 +205,33 @@ public class VirtualArduino : MonoBehaviour, IConnectable
         return null;
     }
 
+    // ================== Initialize pins ==================
+
     void InitializePins()
     {
-        for (int i = 0; i < 14; i++)
-        {
-            digitalPins.Add(new Pin(i));
-        }
+        digitalPins.Clear();
+        analogPins.Clear();
 
+        // D0..D12
+        for (int i = 0; i <= 12; i++)
+            digitalPins.Add(new Pin(i));
+
+        // A0..A5 (внутри 0..5)
         for (int i = 0; i < 6; i++)
-        {
             analogPins.Add(new Pin(i));
-        }
     }
+
+    // ================== Digital ==================
 
     public bool DigitalWrite(int pin, int value)
     {
-        if (pin < 0 || pin >= digitalPins.Count)
+        if (!IsDigitalPin(pin))
         {
-            Debug.LogError($"Invalid pin number: {pin}");
+            Debug.LogError($"Invalid digital pin number: {pin}");
             return false;
         }
 
-        Pin targetPin = digitalPins[pin];
-
         float newVoltage = (value > 0) ? Pin.OPERATING_VOLTAGE : 0f;
-        if (Mathf.Abs(targetPin.voltage - newVoltage) < 0.01f)
-        {
-            Debug.Log($"Pin {pin} already at value {value}, but processing anyway");
-        }
 
         if (!CheckCurrentLimit(pin, value))
         {
@@ -188,30 +239,32 @@ public class VirtualArduino : MonoBehaviour, IConnectable
             return false;
         }
 
+        Pin targetPin = digitalPins[pin];
         targetPin.voltage = newVoltage;
+
         OnDigitalWrite?.Invoke(pin, value);
 
-        UpdateConnectedComponents(pin, value);
+        // ✅ важно: передаем именно 0/5V
+        UpdateConnectedComponentsVoltage(pin, newVoltage);
         return true;
     }
 
     public int DigitalRead(int pin)
     {
-        if (pin < 0 || pin >= digitalPins.Count)
+        if (!IsDigitalPin(pin))
         {
-            Debug.LogError($"Invalid pin number: {pin}");
+            Debug.LogError($"Invalid digital pin number: {pin}");
             return 0;
         }
 
-        Pin targetPin = digitalPins[pin];
-        return (targetPin.voltage > 2.5f) ? 1 : 0;
+        return (digitalPins[pin].voltage > 2.5f) ? 1 : 0;
     }
 
     public void SetPinMode(int pin, PinMode mode)
     {
-        if (pin < 0 || pin >= digitalPins.Count)
+        if (!IsDigitalPin(pin))
         {
-            Debug.LogError($"Invalid pin number: {pin}");
+            Debug.LogError($"Invalid digital pin number: {pin}");
             return;
         }
 
@@ -219,11 +272,13 @@ public class VirtualArduino : MonoBehaviour, IConnectable
         Debug.Log($"Pin {pin} set to {mode}");
     }
 
+    // analogWrite() в Arduino — это PWM по цифровым пинам
+    // value: 0..255
     public bool AnalogWrite(int pin, float value)
     {
-        if (pin < 0 || pin >= digitalPins.Count)
+        if (!IsDigitalPin(pin))
         {
-            Debug.LogError($"Invalid pin number: {pin}");
+            Debug.LogError($"Invalid digital pin number: {pin}");
             return false;
         }
 
@@ -235,94 +290,136 @@ public class VirtualArduino : MonoBehaviour, IConnectable
             return false;
         }
 
+        // PWM -> "среднее" напряжение 0..5V (упрощенная модель)
         float voltage = Mathf.Clamp(value, 0f, 255f) * Pin.OPERATING_VOLTAGE / 255f;
+
         targetPin.voltage = voltage;
+
         OnAnalogWrite?.Invoke(pin, voltage);
 
-        UpdateConnectedComponents(pin, voltage > 0 ? 1 : 0);
+        // ✅ КЛЮЧЕВО: передаем реальное напряжение, а не 0/5
+        UpdateConnectedComponentsVoltage(pin, voltage);
         return true;
     }
 
-    public int AnalogRead(int pin)
+    // ================== Analog ==================
+
+    public int AnalogRead(int pinNumber)
     {
-        if (pin < 0 || pin >= analogPins.Count)
+        if (!TryMapAnalogPinNumber(pinNumber, out int idx))
         {
-            Debug.LogError($"Invalid analog pin number: {pin}");
+            Debug.LogError($"Invalid analog pin number: {pinNumber}");
             return 0;
         }
 
-        Pin targetPin = analogPins[pin];
-        return Mathf.RoundToInt(targetPin.voltage * 1023f / Pin.OPERATING_VOLTAGE);
+        float v = analogPins[idx].voltage;
+        return Mathf.RoundToInt(v * 1023f / Pin.OPERATING_VOLTAGE);
     }
+
+    public void SetAnalogVoltage(int analogPinNumber, float voltage)
+    {
+        int index = analogPinNumber;
+
+        if (analogPinNumber >= 300 && analogPinNumber <= 305)
+            index = analogPinNumber - 300;
+
+        if (index < 0 || index >= analogPins.Count)
+        {
+            Debug.LogError($"Invalid analog pin: {analogPinNumber}");
+            return;
+        }
+
+        analogPins[index].voltage = Mathf.Clamp(voltage, 0f, Pin.OPERATING_VOLTAGE);
+    }
+
+    public float GetAnalogVoltage(int analogPinNumber)
+    {
+        int index = analogPinNumber;
+
+        if (analogPinNumber >= 300 && analogPinNumber <= 305)
+            index = analogPinNumber - 300;
+
+        if (index < 0 || index >= analogPins.Count)
+            return 0f;
+
+        return analogPins[index].voltage;
+    }
+
+    // ================== Current limit / resistance ==================
 
     private bool CheckCurrentLimit(int pin, int value)
     {
         if (value == 0) return true;
 
-        Pin targetPin = digitalPins[pin];
         float estimatedCurrent = CalculateCurrent(pin);
 
         if (estimatedCurrent > Pin.MAX_CURRENT)
         {
             Debug.LogWarning($"Current overload on pin {pin}! {estimatedCurrent:F3}A > {Pin.MAX_CURRENT}A");
-            if (ArduinoSimulator.Instance != null)
-                ArduinoSimulator.Instance.SerialPrint($"WARNING: Current overload on pin {pin}!");
+            ArduinoSimulator.Instance?.SerialPrint($"WARNING: Current overload on pin {pin}!");
             return false;
         }
 
-        targetPin.current = estimatedCurrent;
+        digitalPins[pin].current = estimatedCurrent;
         return true;
     }
 
     private float CalculateCurrent(int pin)
     {
         float totalResistance = 0f;
-        int connectedCount = 0;
 
-        if (connections.ContainsKey(pin))
+        int key = NormalizePinKey(pin);
+        if (connections.ContainsKey(key))
         {
-            foreach (var connection in connections[pin])
+            foreach (var connection in connections[key])
             {
                 CircuitComponent circuitComp = connection.targetComponent as CircuitComponent;
                 if (circuitComp != null && circuitComp.resistance > 0)
-                {
                     totalResistance += circuitComp.resistance;
-                    connectedCount++;
-                }
             }
         }
 
-        if (totalResistance == 0f) return 0f;
+        if (totalResistance <= 0.0001f) return 0f;
         return Pin.OPERATING_VOLTAGE / totalResistance;
     }
 
-    private void UpdateConnectedComponents(int pin, int value)
+    // ================== Update connected components ==================
+
+    // ✅ Новый метод: обновляем компоненты реальным напряжением
+    private void UpdateConnectedComponentsVoltage(int pin, float voltage)
     {
-        if (connections.ContainsKey(pin))
+        int key = NormalizePinKey(pin);
+
+        if (!connections.ContainsKey(key)) return;
+
+        foreach (var connection in connections[key])
         {
-            foreach (var connection in connections[pin])
+            CircuitComponent circuitComp = connection.targetComponent as CircuitComponent;
+            if (circuitComp == null) continue;
+
+            if (!circuitComp.isActive)
             {
-                CircuitComponent circuitComp = connection.targetComponent as CircuitComponent;
-                if (circuitComp != null)
-                {
-                    float voltage = (value > 0) ? Pin.OPERATING_VOLTAGE : 0f;
-
-                    if (!circuitComp.isActive)
-                    {
-                        Debug.LogWarning($"Component {circuitComp.name} is not active, forcing update");
-                        circuitComp.isActive = true;
-                    }
-
-                    circuitComp.OnVoltageChanged(voltage);
-                }
+                Debug.LogWarning($"Component {circuitComp.name} is not active, forcing update");
+                circuitComp.isActive = true;
             }
+
+            circuitComp.OnVoltageChanged(voltage);
         }
+    }
+
+    // (Опционально) Старый стиль: если где-то в будущем пригодится
+    private void UpdateConnectedComponentsDigital(int pin, int value)
+    {
+        float voltage = (value > 0) ? Pin.OPERATING_VOLTAGE : 0f;
+        UpdateConnectedComponentsVoltage(pin, voltage);
     }
 
     public void ConnectComponent(int pin, IConnectable component)
     {
-        if (!connections.ContainsKey(pin))
-            connections[pin] = new List<WireConnection>();
+        int key = NormalizePinKey(pin);
+
+        if (!connections.ContainsKey(key))
+            connections[key] = new List<WireConnection>();
 
         WireConnection newConnection = new WireConnection
         {
@@ -330,22 +427,21 @@ public class VirtualArduino : MonoBehaviour, IConnectable
             targetComponent = component
         };
 
-        connections[pin].Add(newConnection);
+        connections[key].Add(newConnection);
 
-        if (pin >= 0 && pin < digitalPins.Count)
+        if (IsDigitalPin(pin))
         {
             digitalPins[pin].isConnected = true;
             digitalPins[pin].connectedComponent = component;
         }
 
-        Debug.Log($"Connected {component.GetName()} to Arduino pin {pin}");
+        Debug.Log($"Connected {component.GetName()} to Arduino pin {pin} (key={key})");
     }
 
     public void SendSerialData(string data)
     {
         OnSerialData?.Invoke(data);
-        if (ArduinoSimulator.Instance != null)
-            ArduinoSimulator.Instance.SerialPrint(data);
+        ArduinoSimulator.Instance?.SerialPrint(data);
     }
 
     [System.Serializable]
@@ -357,64 +453,87 @@ public class VirtualArduino : MonoBehaviour, IConnectable
 
     public void DebugPinInfo(int pin)
     {
-        if (pin >= 0 && pin < digitalPins.Count)
+        if (IsDigitalPin(pin))
         {
-            var pinInfo = digitalPins[pin];
-            Debug.Log($"=== Pin {pin} Info ===");
-            Debug.Log($"Mode: {pinInfo.mode}");
-            Debug.Log($"Voltage: {pinInfo.voltage}V");
-            Debug.Log($"Current: {pinInfo.current}A");
-            Debug.Log($"Connected: {pinInfo.isConnected}");
-            Debug.Log($"PWM capable: {pinInfo.isPWM}");
+            var p = digitalPins[pin];
+            Debug.Log($"=== Digital Pin D{pin} === mode={p.mode}, V={p.voltage:0.00}V, I={p.current:0.000}A, PWM={p.isPWM}");
+            return;
         }
+
+        if (TryMapAnalogPinNumber(pin, out int idx))
+        {
+            var a = analogPins[idx];
+            Debug.Log($"=== Analog Pin A{idx} (pin={pin}) === V={a.voltage:0.00}V");
+            return;
+        }
+
+        Debug.LogWarning($"Unknown pin: {pin}");
     }
+
+    // ================== LED helper (не обязательно, но пусть останется) ==================
 
     public bool SafeDigitalWriteForLED(int pin, int value)
     {
-        if (pin < 0 || pin >= digitalPins.Count)
+        if (!IsDigitalPin(pin))
         {
-            Debug.LogError($"Invalid pin number: {pin}");
+            Debug.LogError($"Invalid digital pin number: {pin}");
             return false;
         }
 
-        Pin targetPin = digitalPins[pin];
-
-        if (targetPin.mode != PinMode.Output)
-        {
-            Debug.LogWarning($"Pin {pin} is not in OUTPUT mode");
+        if (digitalPins[pin].mode != PinMode.Output)
             SetPinMode(pin, PinMode.Output);
-        }
 
         float safeVoltage = (value > 0) ? 3.3f : 0f;
-        targetPin.voltage = safeVoltage;
-        UpdateConnectedComponents(pin, value > 0 ? 1 : 0);
+
+        digitalPins[pin].voltage = safeVoltage;
+        UpdateConnectedComponentsVoltage(pin, safeVoltage);
 
         return true;
     }
 
-    public bool AnalogWriteForLED(int pin, float value)
+    // ================== Quick test keys ==================
+
+    void Update()
     {
-        if (pin < 0 || pin >= digitalPins.Count)
+        // F5 — toggle D(testPin)
+        if (Input.GetKeyDown(KeyCode.F5))
         {
-            Debug.LogError($"Invalid pin number: {pin}");
-            return false;
+            SetPinMode(testPin, PinMode.Output);
+            testState = !testState;
+            DigitalWrite(testPin, testState ? 1 : 0);
+            Debug.Log($"TEST: D{testPin} => {(testState ? "HIGH" : "LOW")}");
         }
 
-        Pin targetPin = digitalPins[pin];
-
-        if (!targetPin.isPWM)
+        // F6 — плавно прогнать PWM (наглядно)
+        if (Input.GetKeyDown(KeyCode.F6))
         {
-            Debug.LogError($"Pin {pin} does not support PWM");
-            return false;
+            StartCoroutine(TestPwmSweep());
+        }
+    }
+
+    private IEnumerator TestPwmSweep()
+    {
+        if (!IsDigitalPin(testPin) || !digitalPins[testPin].isPWM)
+        {
+            Debug.LogWarning($"TEST PWM: pin {testPin} is not PWM. Use 3,5,6,9,10,11");
+            yield break;
         }
 
-        float maxLEDVoltage = 3.3f;
-        float voltage = Mathf.Clamp(value, 0f, 255f) * maxLEDVoltage / 255f;
+        SetPinMode(testPin, PinMode.Output);
 
-        targetPin.voltage = voltage;
-        OnAnalogWrite?.Invoke(pin, voltage);
+        for (int v = 0; v <= 255; v += 10)
+        {
+            AnalogWrite(testPin, v);
+            yield return new WaitForSeconds(0.05f);
+        }
 
-        UpdateConnectedComponents(pin, voltage > 0 ? 1 : 0);
-        return true;
+        for (int v = 255; v >= 0; v -= 10)
+        {
+            AnalogWrite(testPin, v);
+            yield return new WaitForSeconds(0.05f);
+        }
+
+        AnalogWrite(testPin, 0);
+        Debug.Log("TEST PWM: sweep done");
     }
 }

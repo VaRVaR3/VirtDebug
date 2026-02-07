@@ -1,146 +1,138 @@
 using UnityEngine;
 
-public class VirtualPotentiometer : CircuitComponent
+public class VirtualPotentiometer : MonoBehaviour, IConnectable
 {
-    [Header("Potentiometer Settings")]
-    public float minResistance = 0f;
-    public float maxResistance = 10000f;
-    public float currentResistance = 1000f;
-    public float rotationAngle = 0f;
+    [Header("Pins")]
+    public int pinLeft = 1;
+    public int pinWiper = 2;
+    public int pinRight = 3;
+
+    [Header("Value")]
+    [Range(0f, 1f)]
+    public float value01 = 0.5f;
+
+    public float vRef = 5f;
+
+    [Header("Interaction")]
+    public bool allowMouseWheel = true;
+    public float wheelSpeed = 0.1f;
+
+    [Header("Visual")]
+    public Transform knob;
     public float maxRotation = 270f;
 
-    private Transform knobTransform;
-    private Vector3 initialMousePosition;
-    private bool isDragging = false;
+    private IConnectable leftTo;
+    private int leftPin;
 
-    void Start()
+    private IConnectable wiperTo;
+    private int wiperPin;
+
+    private IConnectable rightTo;
+    private int rightPin;
+
+    void Awake()
     {
-        knobTransform = transform.Find("Knob");
-        if (knobTransform == null)
+        if (knob == null)
         {
-            GameObject knob = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            knob.name = "Knob";
-            knob.transform.parent = transform;
-            knob.transform.localScale = new Vector3(0.3f, 0.1f, 0.3f);
-            knob.transform.localPosition = new Vector3(0, 0.2f, 0);
-            knobTransform = knob.transform;
+            Transform t = transform.Find("Cylinder");
+            if (t == null) t = transform.Find("Knob");
+            if (t != null) knob = t;
         }
-
-        resistance = currentResistance;
-        maxVoltage = 50f;
-        maxCurrent = 0.1f;
-        requiresPolarity = false;
-
-        UpdateKnobRotation();
     }
 
-    void OnMouseDown()
+    // ===== IConnectable =====
+
+    public string GetName() => name;
+
+    public void OnConnected(int pin, IConnectable otherComponent, int otherPin)
     {
-        if (!isActive) return;
+        if (pin == pinLeft) { leftTo = otherComponent; leftPin = otherPin; }
+        if (pin == pinWiper) { wiperTo = otherComponent; wiperPin = otherPin; }
+        if (pin == pinRight) { rightTo = otherComponent; rightPin = otherPin; }
 
-        isDragging = true;
-        initialMousePosition = Input.mousePosition;
+        TryApply();
     }
 
-    void OnMouseDrag()
+    public void OnDisconnected(int pin)
     {
-        if (!isDragging || !isActive) return;
-
-        float deltaY = Input.mousePosition.y - initialMousePosition.y;
-        float resistanceChange = deltaY * (maxResistance - minResistance) / 300f;
-
-        currentResistance = Mathf.Clamp(
-            currentResistance + resistanceChange,
-            minResistance,
-            maxResistance
-        );
-
-        resistance = currentResistance;
-
-        rotationAngle = Mathf.Lerp(0, maxRotation,
-            (currentResistance - minResistance) / (maxResistance - minResistance));
-
-        UpdateKnobRotation();
-
-        initialMousePosition = Input.mousePosition;
-
-        OnResistanceChanged();
+        if (pin == pinLeft) leftTo = null;
+        if (pin == pinWiper) wiperTo = null;
+        if (pin == pinRight) rightTo = null;
     }
 
-    void OnMouseUp()
+    public Vector3 GetPinPosition(int pin)
     {
-        isDragging = false;
+        var pins = GetComponentsInChildren<UltraSimplePin>();
+        foreach (var p in pins)
+            if (p.pinNumber == pin)
+                return p.transform.position;
+
+        return transform.position;
     }
+
+    public bool CanConnectTo(int pin, IConnectable otherComponent, int otherPin) => true;
+
+    // ===== Update =====
 
     void Update()
     {
-        if (Input.GetKey(KeyCode.UpArrow))
+        if (!allowMouseWheel) return;
+
+        float scroll = Input.GetAxis("Mouse ScrollWheel");
+        if (Mathf.Abs(scroll) < 0.0001f) return;
+
+        var cam = Camera.main;
+        if (cam == null) return;
+
+        Ray ray = cam.ScreenPointToRay(Input.mousePosition);
+
+        if(!Physics.Raycast(ray, out RaycastHit hit, 500f, ~0, QueryTriggerInteraction.Collide))
+            return;
+
+
+        if (!hit.transform.IsChildOf(transform))
+            return;
+
+        value01 = Mathf.Clamp01(value01 + scroll * wheelSpeed);
+
+        UpdateKnobVisual();
+        TryApply();
+    }
+
+    // ===== Visual =====
+
+    private void UpdateKnobVisual()
+    {
+        if (knob == null) return;
+
+        float angle = Mathf.Lerp(0f, maxRotation, value01);
+        knob.localRotation = Quaternion.Euler(0f, angle, 0f);
+    }
+
+    // ===== Logic =====
+
+    private void TryApply()
+    {
+        if (wiperTo == null) return;
+
+        VirtualArduino arduino = wiperTo as VirtualArduino;
+        if (arduino == null) return;
+
+        bool powerOK = (leftPin == 200);
+        bool groundOK = (rightPin == 100 || rightPin == 101);
+
+        if (!powerOK || !groundOK)
         {
-            currentResistance = Mathf.Min(currentResistance + 10f, maxResistance);
-            resistance = currentResistance;
-            UpdateKnobRotation();
-            OnResistanceChanged();
-        }
-        else if (Input.GetKey(KeyCode.DownArrow))
-        {
-            currentResistance = Mathf.Max(currentResistance - 10f, minResistance);
-            resistance = currentResistance;
-            UpdateKnobRotation();
-            OnResistanceChanged();
-        }
-    }
-
-    private void UpdateKnobRotation()
-    {
-        if (knobTransform != null)
-        {
-            knobTransform.localRotation = Quaternion.Euler(0, rotationAngle, 0);
-        }
-    }
-
-    private void OnResistanceChanged()
-    {
-        if (positivePin >= 0 && connectedArduino != null)
-        {
-            float voltage = connectedArduino.DigitalRead(positivePin) * 5.0f;
-            OnVoltageChanged(voltage);
+            arduino.SetAnalogVoltage(wiperPin, 0f);
+            return;
         }
 
-        Debug.Log($"Potentiometer resistance: {currentResistance}?");
-    }
+        if (wiperPin < 300 || wiperPin > 305)
+            return;
 
-    public void SetResistance(float newResistance)
-    {
-        currentResistance = Mathf.Clamp(newResistance, minResistance, maxResistance);
-        resistance = currentResistance;
+        float voltage = value01 * vRef;
+        arduino.SetAnalogVoltage(wiperPin, voltage);
 
-        rotationAngle = Mathf.Lerp(0, maxRotation,
-            (currentResistance - minResistance) / (maxResistance - minResistance));
-
-        UpdateKnobRotation();
-        OnResistanceChanged();
-    }
-
-    public float GetResistancePercentage()
-    {
-        return (currentResistance - minResistance) / (maxResistance - minResistance) * 100f;
-    }
-
-    public override void OnVoltageChanged(float voltage)
-    {
-        base.OnVoltageChanged(voltage);
-
-        Renderer rend = GetComponent<Renderer>();
-        if (rend != null && isActive)
-        {
-            float intensity = Mathf.Clamp01(voltage / maxVoltage);
-            Color baseColor = Color.Lerp(Color.gray, new Color(1f, 0.65f, 0f), intensity);
-            rend.material.color = baseColor;
-        }
-    }
-
-    public override void UpdateComponent()
-    {
-        // Пустая реализация
+        Debug.Log($"Pot {name}: A{wiperPin - 300} = {voltage:0.00}V");
     }
 }

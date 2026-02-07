@@ -188,7 +188,7 @@ Transform:
   m_GameObject: {fileID: 6879149594812909412}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.049, y: -1.1909992, z: -0.262}
+  m_LocalPosition: {x: 0.049, y: -1.369, z: -0.262}
   m_LocalScale: {x: 0.05, y: 0.6, z: 0.05}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -283,6 +283,7 @@ MonoBehaviour:
   pinMode: 0
   isGroundPin: 0
   isPowerPin: 0
+  colliderRadius: 0.15
   normalColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   connectedColor: {r: 0, g: 1, b: 0, a: 1}
 --- !u!1 &7710130257656390635
@@ -314,7 +315,7 @@ Transform:
   m_GameObject: {fileID: 7710130257656390635}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.04, y: -1.27, z: 0.25}
+  m_LocalPosition: {x: 0.04, y: -1.486, z: 0.25}
   m_LocalScale: {x: 0.05, y: 0.8, z: 0.05}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -409,6 +410,7 @@ MonoBehaviour:
   pinMode: 0
   isGroundPin: 0
   isPowerPin: 0
+  colliderRadius: 0.15
   normalColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   connectedColor: {r: 0, g: 1, b: 0, a: 1}
 --- !u!1 &9054907014111307589
